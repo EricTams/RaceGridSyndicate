@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sprite Forge — 8-way pixel buggy</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+ --bg:#1a1032;--bg2:#2b1b52;--ink:#fff6d6;--dim:#b8a9d9;--line:#4a3a7a;--panel:#120b24}
+html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%}
+body{margin:0;min-height:100%;background:var(--bg);background-image:linear-gradient(var(--bg) 0 50%,var(--bg2) 50% 100%);background-size:100% 6px;
+ color:var(--ink);font-family:"Press Start 2P","Courier New",monospace;display:flex;flex-direction:column;align-items:center;padding:12px 10px 24px}
+h1{font-size:clamp(13px,4vw,20px);margin:6px 0 4px;color:#ffd23f;text-shadow:3px 3px 0 #b8342e,5px 5px 0 #3a0d2a}
+p.sub{font-size:8px;color:var(--dim);line-height:1.8;text-align:center;margin:0 0 14px;max-width:520px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:14px;width:min(100%,640px)}
+@media(max-width:520px){.row{grid-template-columns:1fr}}
+.card{border:4px solid var(--line);box-shadow:0 0 0 4px var(--panel),8px 8px 0 #000;background:#000;padding:0}
+.card h2{font-size:8px;margin:0;padding:8px;background:var(--panel);color:var(--dim)}
+canvas.pix{width:100%;display:block;image-rendering:pixelated;image-rendering:crisp-edges;background:#4aa544;
+ background-image:linear-gradient(45deg,#3f9139 25%,transparent 25% 75%,#3f9139 75%);background-size:16px 16px}
+.ctl{width:min(100%,640px);margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px 18px;font-size:8px;line-height:2}
+@media(max-width:520px){.ctl{grid-template-columns:1fr}}
+label{display:flex;flex-direction:column;gap:4px}
+input[type=range]{accent-color:#ffd23f;width:100%}
+input[type=color]{width:100%;height:28px;border:2px solid var(--line);background:#000;padding:0}
+.tog{display:flex;align-items:center;gap:8px;cursor:pointer}
+.tog input{accent-color:#ffd23f;width:16px;height:16px}
+button{font:inherit;font-size:8px;color:var(--ink);background:#b8342e;border:0;padding:12px;cursor:pointer;
+ box-shadow:inset -3px -3px 0 #6b1414,inset 3px 3px 0 #ff8a70,4px 4px 0 #000}
+button:active{transform:translate(2px,2px)}
+button:focus-visible,input:focus-visible{outline:3px solid #ffd23f;outline-offset:3px}
+code{color:#7dff6b}
+</style>
+</head>
+<body>
+<h1>SPRITE FORGE</h1>
+<p class="sub">A low-poly buggy, a three-band shader, and an outline pass — rendered at 8 headings so it reads like hand-pixelled sprites.</p>
+
+<div class="row">
+  <div class="card"><h2>Live model (snapped to 8 headings)</h2><canvas class="pix" id="live" width="64" height="64"></canvas></div>
+  <div class="card"><h2>Sprite sheet</h2><canvas class="pix" id="sheet" width="192" height="96"></canvas></div>
+</div>
+
+<div class="ctl">
+  <label class="tog"><input type="checkbox" id="snap" checked> Snap rotation to 8 headings</label>
+  <label class="tog"><input type="checkbox" id="outline" checked> Black outline pass</label>
+  <label>Camera tilt <span id="tiltv">30°</span><input type="range" id="tilt" min="15" max="60" value="30"></label>
+  <label>Sprite resolution <span id="resv">48px</span><input type="range" id="res" min="24" max="96" step="8" value="48"></label>
+  <label>Body colour<input type="color" id="body" value="#ff5a36"></label>
+  <label>Trim colour<input type="color" id="trim" value="#ffd23f"></label>
+  <label>Shade steps <span id="stepsv">3</span><input type="range" id="steps" min="2" max="6" value="3"></label>
+  <button id="regen">Rebuild sheet</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(()=>{
+const $=id=>document.getElementById(id);
+
+// ---------- the shader: quantised Lambert + tiny rim, palette-per-part ----------
+const vert=`
+  varying vec3 vN; varying vec3 vP;
+  void main(){ vN=normalize(normalMatrix*normal); vP=(modelViewMatrix*vec4(position,1.)).xyz;
+    gl_Position=projectionMatrix*vec4(vP,1.); }`;
+const frag=`
+  uniform vec3 uColor; uniform vec3 uLight; uniform float uSteps;
+  varying vec3 vN; varying vec3 vP;
+  void main(){
+    vec3 n=normalize(vN);
+    float d=dot(n,normalize(uLight));           // -1..1
+    float t=clamp(d*0.5+0.5,0.,1.);              // 0..1
+    t=floor(t*uSteps)/(uSteps-1.);               // hard bands
+    t=clamp(t,0.,1.);
+    // build a lit/shadow palette from the base colour (shadow tints cooler)
+    vec3 shadow=mix(uColor*0.35,vec3(0.15,0.10,0.35),0.35);
+    vec3 lit=uColor;
+    vec3 hi=mix(uColor,vec3(1.,0.97,0.85),0.45);
+    vec3 c=mix(shadow,lit,t);
+    if(t>=0.999) c=hi;                             // top band = specular pop
+    gl_FragColor=vec4(c,1.);
+  }`;
+const LIGHT=new THREE.Vector3(-0.6,1.0,0.5); // fixed in *view* space so every sprite is lit from upper-left
+function mat(hex){return new THREE.ShaderMaterial({vertexShader:vert,fragmentShader:frag,
+  uniforms:{uColor:{value:new THREE.Color(hex)},uLight:{value:LIGHT},uSteps:{value:3}}});}
+
+// ---------- the model: boxes and cylinders, nothing fancy ----------
+const mats={body:mat('#ff5a36'),trim:mat('#ffd23f'),tyre:mat('#2a2a2a'),dark:mat('#1a1a1a'),glass:mat('#9be0ff'),helm:mat('#ffffff')};
+function buildBuggy(){
+  const g=new THREE.Group();
+  const add=(geo,m,x,y,z,rx=0,ry=0,rz=0)=>{const o=new THREE.Mesh(geo,m);o.position.set(x,y,z);o.rotation.set(rx,ry,rz);g.add(o);return o;};
+  add(new THREE.BoxGeometry(1.7,0.35,0.9),mats.body,0,0.42,0);          // chassis
+  add(new THREE.BoxGeometry(0.6,0.28,0.7),mats.body,-0.1,0.72,0);        // cabin base
+  add(new THREE.BoxGeometry(1.7,0.12,0.24),mats.trim,0,0.62,0);          // racing stripe
+  add(new THREE.BoxGeometry(0.5,0.22,0.5),mats.glass,0.15,0.85,0);       // windscreen block
+  add(new THREE.SphereGeometry(0.16,6,5),mats.helm,-0.2,0.98,0);         // helmet
+  add(new THREE.BoxGeometry(0.3,0.05,1.0),mats.dark,-0.85,0.95,0);       // rear wing
+  add(new THREE.BoxGeometry(0.06,0.4,0.06),mats.dark,-0.8,0.75,0.3);
+  add(new THREE.BoxGeometry(0.06,0.4,0.06),mats.dark,-0.8,0.75,-0.3);
+  add(new THREE.BoxGeometry(0.5,0.2,0.3),mats.trim,0.9,0.4,0);           // front bumper
+  const wheel=new THREE.CylinderGeometry(0.28,0.28,0.24,8);
+  [[0.6,0.52],[0.6,-0.52],[-0.6,0.52],[-0.6,-0.52]].forEach(([x,z])=>add(wheel,mats.tyre,x,0.28,z,Math.PI/2,0,0));
+  g.position.y=-0.45;
+  return g;
+}
+
+// ---------- offscreen three.js renderer at sprite resolution ----------
+const renderer=new THREE.WebGLRenderer({alpha:true,antialias:false});
+renderer.setPixelRatio(1);renderer.setClearColor(0x000000,0);
+const scene=new THREE.Scene();const buggy=buildBuggy();scene.add(buggy);
+const cam=new THREE.OrthographicCamera(-1.3,1.3,1.3,-1.3,0.1,100);
+function aimCamera(tiltDeg){
+  const t=THREE.MathUtils.degToRad(tiltDeg),r=10;
+  cam.position.set(0,Math.sin(t)*r,Math.cos(t)*r);cam.lookAt(0,0,0);
+}
+
+// ---------- outline pass in plain 2D: any opaque pixel touching transparency gets a black rim ----------
+const scratch=document.createElement('canvas'),sg=scratch.getContext('2d');
+function renderSprite(yaw,size){
+  renderer.setSize(size,size,false);
+  buggy.rotation.y=yaw;
+  renderer.render(scene,cam);
+  scratch.width=size;scratch.height=size;
+  sg.clearRect(0,0,size,size);sg.drawImage(renderer.domElement,0,0);
+  if(!$('outline').checked)return scratch;
+  const img=sg.getImageData(0,0,size,size),d=img.data,out=new Uint8ClampedArray(d);
+  const a=(x,y)=>x<0||y<0||x>=size||y>=size?0:d[(y*size+x)*4+3];
+  for(let y=0;y<size;y++)for(let x=0;x<size;x++){
+    if(a(x,y)>10)continue;
+    if(a(x-1,y)>10||a(x+1,y)>10||a(x,y-1)>10||a(x,y+1)>10){const i=(y*size+x)*4;out[i]=0;out[i+1]=0;out[i+2]=0;out[i+3]=255;}
+  }
+  img.data.set(out);sg.putImageData(img,0,0);return scratch;
+}
+
+// ---------- outputs ----------
+const live=$('live'),lg=live.getContext('2d');
+const sheet=$('sheet'),shg=sheet.getContext('2d');
+[lg,shg].forEach(c=>c.imageSmoothingEnabled=false);
+function buildSheet(){
+  const size=+$('res').value;
+  sheet.width=size*4;sheet.height=size*2;shg.imageSmoothingEnabled=false;
+  for(let i=0;i<8;i++){
+    const s=renderSprite(i*Math.PI/4,size);
+    shg.drawImage(s,(i%4)*size,Math.floor(i/4)*size);
+  }
+}
+function applyControls(){
+  aimCamera(+$('tilt').value);$('tiltv').textContent=$('tilt').value+'°';
+  $('resv').textContent=$('res').value+'px';$('stepsv').textContent=$('steps').value;
+  mats.body.uniforms.uColor.value.set($('body').value);
+  mats.trim.uniforms.uColor.value.set($('trim').value);
+  Object.values(mats).forEach(m=>m.uniforms.uSteps.value=+$('steps').value);
+  buildSheet();
+}
+['tilt','res','body','trim','steps','outline'].forEach(id=>$(id).addEventListener('input',applyControls));
+$('regen').addEventListener('click',applyControls);
+
+let yaw=0,last=0;
+function frame(t){
+  const dt=Math.min(.05,(t-last)/1000);last=t;yaw+=dt*0.9;
+  const size=+$('res').value;
+  const shown=$('snap').checked?Math.round(yaw/(Math.PI/4))*(Math.PI/4):yaw;
+  const s=renderSprite(shown,size);
+  live.width=size;live.height=size;lg.imageSmoothingEnabled=false;lg.drawImage(s,0,0);
+  requestAnimationFrame(frame);
+}
+applyControls();requestAnimationFrame(t=>{last=t;frame(t);});
+})();
+</script>
+</body>
+</html>

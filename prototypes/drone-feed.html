@@ -1,0 +1,1368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Syndicate Drone Feed</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:dark;
+ --bg:#0b0716;--panel:#140c26;--panel2:#1c1233;--line:#3b2a66;--ink:#f4ecff;--dim:#9d8cc9;
+ --pink:#ff2e88;--cyan:#2ef2ff;--gold:#ffd23f;--good:#5cff8a;--warn:#ffb03a;--bad:#ff3b3b}
+*,*::before,*::after{box-sizing:border-box}
+html{height:auto}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"VT323","Courier New",monospace;font-size:20px;line-height:1.15;
+ padding-inline:10px;padding-block:8px}
+/* Docking: phone = stacked with drivers right under the feed; >=760px = fills the window with the
+   drivers docked along the bottom under the feed; >=1000px = driver cards switch to a short two-column strip. */
+.app{max-width:1680px;margin:0 auto;display:grid;gap:8px;grid-template-columns:minmax(0,1fr);
+ grid-template-areas:"header" "stage" "drivers" "side"}
+header{grid-area:header}
+.stage-wrap{grid-area:stage;min-width:0;min-height:0;display:flex;flex-direction:column;--fill:0}
+.stage-box{position:relative;min-height:0}
+.drivers{grid-area:drivers;display:grid;grid-template-columns:1fr 1fr;gap:8px;min-height:0;align-content:start}
+.side{grid-area:side;display:flex;flex-direction:column;gap:8px;min-height:0}
+@media(max-width:560px){.drivers{grid-template-columns:1fr}}
+@media(min-width:760px){
+ .app{height:calc(100dvh - 16px);min-height:560px;grid-template-columns:minmax(0,1fr) 260px;
+  grid-template-rows:auto minmax(0,1fr) auto;grid-template-areas:"header header" "stage side" "drivers side"}
+ .stage-wrap{--fill:1}
+ .stage-box{flex:1}
+ .feed{flex:1;min-height:0;overflow:auto}
+}
+@media(min-width:1000px){
+ .drivers .drv-body{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:6px 12px}
+h1{font-family:"Press Start 2P",monospace;font-size:clamp(11px,1.8vw,16px);margin:0 0 2px;color:var(--gold);
+ text-shadow:2px 2px 0 #b8342e,4px 4px 0 #3a0d2a;text-wrap:balance}
+.sub{margin:0;color:var(--dim);font-size:17px}
+.btns{display:flex;flex-wrap:wrap;gap:4px 10px}
+.grp{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.grp>span{font-family:"Press Start 2P",monospace;font-size:7px;color:var(--dim);letter-spacing:.08em;margin-right:2px}
+button{font-family:"Press Start 2P",monospace;font-size:8px;color:var(--ink);background:#2a1b4d;border:0;padding:6px 8px;cursor:pointer;
+ box-shadow:inset -2px -2px 0 #140c26,inset 2px 2px 0 #4a3a7a,2px 2px 0 #000}
+button[aria-pressed=true]{background:var(--pink);color:#1a0a1a;box-shadow:inset -2px -2px 0 #8a1048,inset 2px 2px 0 #ff9cc8,2px 2px 0 #000}
+button:active{transform:translate(1px,1px)}
+button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.stage{position:absolute;background:#07040f;outline:2px solid var(--line);box-shadow:0 0 0 3px var(--panel),4px 4px 0 3px #000}
+.stage canvas{position:absolute;left:0;top:0;image-rendering:pixelated;image-rendering:crisp-edges}
+.stage::after{content:"";position:absolute;inset:0;pointer-events:none;
+ background:repeating-linear-gradient(to bottom,rgba(0,0,0,.16) 0 1px,transparent 1px 3px)}
+.hint{margin:4px 0 0;color:var(--dim);font-size:16px}
+.hint kbd{font-family:"Press Start 2P",monospace;font-size:7px;color:var(--ink);background:var(--panel2);padding:3px 5px;border:1px solid var(--line)}
+.panel{background:var(--panel);border:2px solid var(--line);box-shadow:3px 3px 0 #000;padding:6px 8px}
+.panel h2{font-family:"Press Start 2P",monospace;font-size:8px;letter-spacing:.1em;color:var(--dim);margin:0 0 5px;font-weight:400}
+.tower ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:0}
+.row{display:grid;grid-template-columns:22px 6px minmax(0,1fr) auto 34px;gap:5px;align-items:center;padding:0 4px;font-size:17px;line-height:1.05;font-variant-numeric:tabular-nums}
+.row.you{background:#24163f;box-shadow:inset 2px 0 0 var(--cyan)}
+.row .p{color:var(--dim);text-align:right}
+.row .chip{height:11px}
+.row .n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .n small{color:var(--dim);font-size:14px}
+.row .g{color:var(--dim);font-size:16px;text-align:right}
+.meter{height:6px;background:#2a1f45;position:relative}
+.meter>i{position:absolute;left:0;top:0;bottom:0;display:block}
+.drv{display:flex;flex-direction:column;gap:4px}
+.drv-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.drv-head .hd{color:var(--ink);font-variant-numeric:tabular-nums}.drv-head .hd span{color:var(--dim)}
+.stats{font-size:15px;color:var(--dim);font-variant-numeric:tabular-nums;display:flex;flex-wrap:wrap;gap:0 10px}
+.stats b{color:var(--ink);font-weight:400}
+.abil{display:flex;flex-wrap:wrap;gap:3px}
+.ab{font-family:"Press Start 2P",monospace;font-size:6px;padding:3px 4px;border:1px solid var(--line);color:var(--dim);cursor:help}
+.ab.on{background:var(--gold);border-color:var(--gold);color:#1a0a1a}
+.ab.off{opacity:.45}
+.tunerow{display:flex;flex-wrap:wrap;gap:0 10px;font-size:15px;color:var(--dim);font-variant-numeric:tabular-nums}
+.g-S{color:var(--gold)}.g-A{color:var(--good)}.g-B{color:var(--cyan)}.g-C{color:var(--warn)}.g-D{color:var(--bad)}
+/* Night Tune */
+.nt-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap}
+.nt-sub{font-size:17px;color:var(--dim);margin:0}
+.nt-steps{display:flex;gap:3px;align-items:center;margin:6px 0}
+.nt-steps i{display:block;width:10px;height:10px;background:#2a1f45}
+.nt-steps i.done{background:var(--cyan)}.nt-steps i.now{background:var(--pink)}
+.nt-steps span{font-family:"Press Start 2P",monospace;font-size:6px;color:var(--dim);padding:0 3px}
+.nt-steps span.done{color:var(--cyan)}
+.gauges{display:grid;grid-template-columns:74px minmax(0,1fr) 30px 40px;gap:5px 8px;align-items:center;font-size:17px;font-variant-numeric:tabular-nums}
+.gauges .gl{color:var(--dim)}
+.gbar{position:relative;height:14px;background:#1a1230;border:1px solid var(--line)}
+.gbar .band{position:absolute;top:0;bottom:0;background:rgba(46,242,255,.16);border-left:1px solid var(--cyan);border-right:1px solid var(--cyan)}
+.gbar .win{position:absolute;top:0;bottom:0;background:rgba(255,210,63,.35)}
+.gbar .val{position:absolute;top:-3px;bottom:-3px;width:3px;margin-left:-1px;background:var(--pink)}
+.grade{font-family:"Press Start 2P",monospace;font-size:9px;text-align:center}
+.quotes{border:1px solid var(--line);padding:4px 6px;margin:6px 0;min-height:24px;font-size:17px;color:var(--cyan)}
+.quotes p{margin:0}
+.offer{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px}
+.tcard{font-family:"VT323","Courier New",monospace;font-size:17px;text-align:left;padding:5px 7px;line-height:1.1;background:#24163f}
+.tcard b{display:block;font-family:"Press Start 2P",monospace;font-size:7px;font-weight:400;color:var(--gold);margin-bottom:3px}
+.tcard .up{color:var(--good)}.tcard .dn{color:var(--bad)}
+.trim{display:grid;grid-template-columns:repeat(5,auto);gap:4px;align-items:center;font-size:16px}
+.cmprow{display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center;margin:6px 0}
+.nt-foot{display:flex;flex-wrap:wrap;gap:6px;justify-content:space-between;align-items:center;margin-top:8px}
+.watch{margin-left:auto;font-size:7px;padding:4px 6px;align-self:center}
+.drv-body{display:grid;grid-template-columns:minmax(0,1fr);gap:4px 12px}
+.meters,.orders{display:flex;flex-direction:column;gap:2px}
+.m{display:grid;grid-template-columns:58px minmax(0,1fr) 36px;gap:6px;align-items:center;font-variant-numeric:tabular-nums}
+.m>span:first-child{color:var(--dim)}.m>span:last-child{text-align:right}
+.m .meter{height:8px}
+.flag{position:absolute;top:-2px;bottom:-2px;width:2px;margin-left:-1px;background:var(--ink)}
+.flag.short{background:var(--bad)}
+.ord{display:grid;grid-template-columns:44px repeat(3,minmax(0,1fr));gap:3px;align-items:center}
+.ord>span{color:var(--dim)}
+.ord button{font-size:7px;padding:4px 2px}
+.drv-head .tag{font-family:"Press Start 2P",monospace;font-size:7px;color:#1a0a1a;background:var(--cyan);padding:3px 5px}
+.drv-head b{font-size:20px;font-weight:400;letter-spacing:.04em}
+.drv-head .pos{font-size:20px;color:var(--gold)}
+.status{font-size:18px}
+.feed ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.feed li{font-size:18px;color:var(--dim)}
+.feed li.you{color:var(--cyan)}
+.feed li.bad{color:var(--pink)}
+.feed li span{color:#6b5a99;margin-right:6px}
+.result[hidden]{display:none}
+.result{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(7,4,15,.72)}
+.result .card{background:var(--panel);border:2px solid var(--gold);box-shadow:4px 4px 0 #000;padding:8px 10px;
+ width:min(900px,96%);max-height:94%;overflow:auto;line-height:1.1}
+.result h3{font-family:"Press Start 2P",monospace;font-size:9px;color:var(--gold);margin:0 0 8px}
+.result h4{font-family:"Press Start 2P",monospace;font-size:7px;color:var(--dim);margin:0 0 4px;font-weight:400;letter-spacing:.08em}
+.gcols{display:grid;grid-template-columns:minmax(0,210px) minmax(0,1fr);gap:12px}
+@media(max-width:700px){.gcols{grid-template-columns:1fr}}
+.gres{margin:0 0 6px;padding-left:24px;font-size:17px;font-variant-numeric:tabular-nums}
+.gres li.you{color:var(--cyan)}
+.gmoney{font-size:17px;font-variant-numeric:tabular-nums;margin:0}
+.gmoney b{color:var(--gold);font-weight:400}
+.regwatch{border:1px solid var(--warn);color:var(--warn);padding:3px 6px;margin:0 0 6px;font-size:17px}
+.regwatch.hit{border-color:var(--bad);color:var(--bad)}
+.ptab{width:100%;border-collapse:collapse;font-size:17px;font-variant-numeric:tabular-nums}
+.ptab th{font-family:"Press Start 2P",monospace;font-size:6px;color:var(--dim);font-weight:400;text-align:left;padding:2px 4px}
+.ptab td{padding:2px 4px;border-top:1px solid var(--line);white-space:nowrap}
+.ptab td.over{color:var(--warn)}
+.ptab button{font-size:7px;padding:4px 5px}
+.ptab button:disabled{opacity:.35;cursor:default}
+.gfoot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;font-size:16px;color:var(--dim)}
+.parts{display:grid;grid-template-columns:repeat(4,auto minmax(0,1fr));gap:2px 6px;align-items:center;font-size:16px}
+.parts>span{color:var(--dim)}
+.parts .meter{height:6px}
+@media (prefers-reduced-motion:reduce){.stage::after{display:none}}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div>
+      <h1>SYNDICATE // DRONE FEED</h1>
+      <p class="sub"><span id="seasonTxt">Season 1 · Race 1/4</span> · <span title="Track tags drive some driver abilities">Canal District Circuit <small id="trackTags"></small></span> · <span id="lapsTxt">6 laps</span> · <span id="cashTxt">1.50M QT</span></p>
+    </div>
+    <div class="btns">
+      <div class="grp" role="group" aria-label="Main view"><span>VIEW</span>
+        <button id="v-full" aria-pressed="true">FULL TRACK</button>
+        <button id="v-c1" aria-pressed="false">CAR 1</button>
+        <button id="v-c2" aria-pressed="false">CAR 2</button>
+        <button id="pip" aria-pressed="true">PIP</button>
+      </div>
+      <div class="grp" role="group" aria-label="Race length"><span>LAPS</span>
+        <button id="l4" aria-pressed="false">4</button>
+        <button id="l6" aria-pressed="true">6</button>
+        <button id="l10" aria-pressed="false">10</button>
+        <button id="l15" aria-pressed="false">15</button>
+      </div>
+      <div class="grp" role="group" aria-label="Sim speed"><span>SIM</span>
+        <button id="s1" aria-pressed="true">1X</button>
+        <button id="s2" aria-pressed="false">2X</button>
+        <button id="s4" aria-pressed="false">4X</button>
+        <button id="pause" aria-pressed="false">PAUSE</button>
+        <button id="restart">RESTART</button>
+      </div>
+    </div>
+  </header>
+
+  <section class="stage-wrap" id="wrap">
+    <div class="stage-box" id="box">
+      <div class="stage" id="stage">
+        <canvas id="gl"></canvas>
+        <canvas id="ov"></canvas>
+        <div class="result" id="tuneOv" hidden><div class="card" id="tune"></div></div>
+        <div class="result" id="result" hidden>
+          <div class="card" id="garage"></div>
+        </div>
+      </div>
+    </div>
+    <p class="hint"><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> switch view · <kbd>P</kbd> picture-in-picture · <kbd>SPACE</kbd> pause · click a small cam to swap it into the main view</p>
+  </section>
+
+  <section class="drivers" aria-label="Your drivers">
+    <div class="panel drv" id="drv0"></div>
+    <div class="panel drv" id="drv1"></div>
+  </section>
+
+  <aside class="side">
+    <div class="panel tower"><h2>TIMING TOWER</h2><ol id="tower"></ol></div>
+    <div class="panel feed"><h2>COMMS</h2><ol id="feed"></ol></div>
+  </aside>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(()=>{
+'use strict';
+const $=id=>document.getElementById(id);
+const mod=(a,n)=>((a%n)+n)%n;
+const rand=(a,b)=>a+Math.random()*(b-a);
+
+// ================= tuning constants =================
+// TRACK_SCALE stretches the circuit layout (not its width) so cars and scenery read smaller against it.
+const CAR_SCALE=1.4, TRACK_SCALE=1.35, HW=3.5, BRAKE=38, HEADINGS=16;
+let LAPS=6; // race length, set from the LAPS buttons
+const SECTOR_COLORS=['#ff2e88','#2ef2ff','#b36bff'];
+// Radio orders: one aggression setting each for fuel, tires and guns.
+const ORDERS={
+  fuel:{label:'FUEL',opts:{lean:{label:'LEAN',spd:0.97,burn:0.8},std:{label:'STD',spd:1,burn:1},rich:{label:'RICH',spd:1.05,burn:1.3}}},
+  tires:{label:'TIRES',opts:{save:{label:'SAVE',grip:0.95,wear:0.6},std:{label:'STD',grip:1,wear:1},push:{label:'PUSH',grip:1.06,wear:1.7}}},
+  guns:{label:'GUNS',opts:{hold:{label:'HOLD',rate:0,acc:0},std:{label:'STD',rate:1,acc:0.62},free:{label:'FREE',rate:1.6,acc:0.5}}},
+};
+const AMMO=90,BURST=3;   // rounds in the magazine; rounds spent per trigger pull
+
+// Parts: engine, chassis, body (armour plating + bodywork aero) and weapons. Each team develops a LEVEL per part; each car's copy has its own CONDITION, which wears every lap.
+// Between races the manager chooses per part: leave it, REBUILD (re-machine/recast the whole part: fresh
+// condition, same level, 60% of a new part's cost) or develop a NEW part (arrives DEV_STEP levels better
+// and fresh after DEV_RACES races). Money is in millions of QT (quint-tokens).
+const PARTS=[{id:'engine',label:'ENGINE',short:'ENG'},{id:'chassis',label:'CHASSIS',short:'CHS'},
+  {id:'body',label:'BODY',short:'BDY'},{id:'weapons',label:'WEAPONS',short:'WPN'}];
+const RACES_PER_SEASON=4,DEV_STEP=6,DEV_RACES=3,REBUILD_SHARE=0.6,WEAR_PER_LAP=1.2;
+const newPartCost=lvl=>0.35*Math.pow(1.06,lvl-50);
+const rebuildCost=lvl=>REBUILD_SHARE*newPartCost(lvl);
+const partF=(lvl,cond)=>(1+(lvl-60)*0.004)*(0.9+0.1*cond/100);   // performance multiplier from a part
+// Placeholder race income until sponsors exist: a base payment plus prize money per car in the top 10.
+const BASE_PAY=0.6,RACE_PAY=[0.5,0.4,0.35,0.3,0.26,0.22,0.19,0.16,0.14,0.12];
+// Regulations: at mid-season the rules committee names 2 parts under review; at season end one gets new
+// regs. Any team whose level on that part is above the field median (+margin) keeps only REG_KEEP of the excess.
+const REG_NAMES={engine:'Flux-limiter mandate',chassis:'Crash-cell standard',body:'Bodywork homologation',weapons:'Ordnance treaty'};
+const REG_MARGIN=2,REG_KEEP=0.35;
+// AI managers: business drives garage calls, tactics shows up as race pace.
+const MGR_TIERS=['rookie','pro','elite'],REBUILD_AT={rookie:30,pro:50,elite:60},TACTICS_PACE={rookie:-0.012,pro:0,elite:0.012};
+const choice=a=>a[Math.floor(Math.random()*a.length)];
+
+// ================= drivers: stats + passive abilities =================
+// Stats run 40-95 around a 70 baseline. Abilities are passive bonuses that switch on by track type,
+// race situation or session; nothing is ever activated by the player.
+const TRACK={name:'Canal District Circuit',tags:['tight','straights','tunnels']};
+const STATS=[['pace','PAC'],['racecraft','RCR'],['tires','TIR'],['fuel','FUE'],['gunnery','GUN'],['composure','CMP'],['feedback','FBK'],['fame','FAM']];
+const ABILITIES={
+  streetrat:{label:'STREET RAT',desc:'+2% grip on tight tracks'},
+  boulevard:{label:'BOULEVARD KING',desc:'+2% top speed on tracks with long straights'},
+  tunnel:{label:'TUNNEL VISION',desc:'No pace loss in dark tunnel sectors (everyone else loses 4%)'},
+  hunter:{label:'HUNTER',desc:'+2% pace and +10% hit chance when close behind another car'},
+  wall:{label:'WALL',desc:'Much harder to pass'},
+  front:{label:'FRONT-RUNNER',desc:'+1.5% pace while in the top 3'},
+  comeback:{label:'COMEBACK KID',desc:'+1% pace and better overtaking while outside the top 10'},
+  cool:{label:'COOL UNDER FIRE',desc:'Takes 25% less damage from gunfire'},
+  closer:{label:'CLOSER',desc:'+3% pace on the final lap'},
+  rocket:{label:'ROCKET START',desc:'+8% pace and acceleration for the first 10 seconds'},
+  pitwhisper:{label:'PIT WHISPERER',desc:'Pit stops take 30% less time'},
+  tirewhisper:{label:'TIRE WHISPERER',desc:'35% less tire wear on PUSH'},
+  miser:{label:'FUEL MISER',desc:'15% less fuel burn on LEAN, and LEAN costs half the pace'},
+  deadeye:{label:'DEADEYE',desc:'Guns never jam; +5% hit chance'},
+  nightowl:{label:'NIGHT OWL',desc:'30% clearer Night Tune feedback'},
+  qualifier:{label:'QUALIFIER',desc:'+pace in qualifying',needs:'qualifying'},
+};
+const has=(c,id)=>c.drv.abilities.includes(id);
+const statMul=(v,per)=>1+(v-70)*per;
+// Hand-built drivers for your team; everyone else is rolled from their team's strength.
+const YOUR_DRIVERS={
+  VEX:{stats:{pace:84,racecraft:72,tires:60,fuel:64,gunnery:71,composure:62,feedback:58,fame:70},abilities:['boulevard','hunter','closer']},
+  JUNO:{stats:{pace:74,racecraft:79,tires:83,fuel:77,gunnery:63,composure:81,feedback:82,fame:55},abilities:['tirewhisper','wall','nightowl']},
+};
+function rollDriver(team){
+  const base=68+(team.pace||0)*8,st={};
+  STATS.forEach(([id])=>st[id]=Math.round(Math.max(40,Math.min(95,base+rand(-14,14)))));
+  // 0 abilities is common, 3 is rare; stronger drivers skew toward more.
+  const avg=STATS.reduce((a,[id])=>a+st[id],0)/STATS.length,roll=Math.random()+(avg-70)/60;
+  const n=roll<0.3?0:roll<0.7?1:roll<0.93?2:3;
+  const pool=Object.keys(ABILITIES).sort(()=>Math.random()-0.5);
+  return {stats:st,abilities:pool.slice(0,n)};
+}
+const fmtQT=m=>`${m.toFixed(2)}M QT`;
+// Tank range and tire life are fixed distances, so longer races need more stops.
+// On STD a full tank lasts ~5.2 laps of this circuit and a set of tires ~6.7 laps.
+const TANK_LAPS=5.2, TIRE_LAPS=6.7;   // TIRE_LAPS is for MEDIUM tires
+// Tire compounds: softs grip but die fast, hards last. Pick a start compound in the Night Tune and a new one at each stop.
+const COMPOUNDS={soft:{label:'SOFT',short:'S',grip:1.06,wear:1.8,col:'#ff3b3b'},
+  medium:{label:'MEDIUM',short:'M',grip:1,wear:1,col:'#ffd23f'},hard:{label:'HARD',short:'H',grip:0.95,wear:0.6,col:'#f4ecff'}};
+const CMP_ORDER=['soft','medium','hard'];
+// plan: attack = RICH/PUSH and extra stops, stretch = fewest stops, std = STD orders.
+// guns/mines/pace/armor give each team a recognisable style on track.
+const TEAMS=[
+  {id:'SYN',name:'SYNDICATE',body:'#ff2e88',trim:'#2ef2ff',you:true,drivers:['VEX','JUNO']},
+  {id:'KBR',name:'NEON KOBRA',body:'#39ff7a',trim:'#1d1a33',plan:'stretch',guns:'free',drivers:['MAMBA','KOIL']},
+  {id:'JKL',name:'CHROME JACKALS',body:'#8f9bb3',trim:'#ff3b3b',plan:'std',drivers:['RUST','HOUND']},
+  {id:'HXD',name:'HEXADYNE',body:'#ff8a1f',trim:'#8a4dff',plan:'attack',drivers:['VOLT','NOVA']},
+  {id:'RON',name:'CRIMSON RONIN',body:'#ff3b3b',trim:'#1a1a1a',plan:'std',guns:'free',armor:0.9,drivers:['KAGE','SORA']},
+  {id:'AZR',name:'AZURE DYNAMICS',body:'#3d7bff',trim:'#f4ecff',plan:'std',pace:0.5,drivers:['ION','PAX']},
+  {id:'GLT',name:'GILT VIPERS',body:'#ffd23f',trim:'#3a0d2a',plan:'attack',pace:0.8,armor:1.1,drivers:['GOLDIE','FANG']},
+  {id:'VOD',name:'VOID CULT',body:'#9b5cff',trim:'#2ef2ff',plan:'std',mines:3,drivers:['HEX','OMEN']},
+  {id:'TDW',name:'TIDEWATER',body:'#1fd1b0',trim:'#0b3a44',plan:'stretch',armor:0.85,drivers:['REEF','SURGE']},
+  {id:'GHL',name:'GHOSTLINE',body:'#f4f4ff',trim:'#3d7bff',plan:'attack',guns:'hold',drivers:['WISP','BANSHEE']},
+];
+
+// ================= 3x5 bitmap font for the in-feed overlay =================
+const GL={A:'010101111101101',B:'110101110101110',C:'011100100100011',D:'110101101101110',E:'111100110100111',F:'111100110100100',
+G:'011100101101011',H:'101101111101101',I:'111010010010111',J:'001001001101010',K:'101101110101101',L:'100100100100111',M:'101111111101101',
+N:'110101101101101',O:'010101101101010',P:'110101110100100',Q:'010101101110011',R:'110101110101101',S:'011100010001110',T:'111010010010010',
+U:'101101101101111',V:'101101101101010',W:'101101111111101',X:'101101010101101',Y:'101101010010010',Z:'111001010100111',
+'0':'111101101101111','1':'010110010010111','2':'110001010100111','3':'110001010001110','4':'101101111001001','5':'111100110001110',
+'6':'011100111101111','7':'111001010010010','8':'111101111101111','9':'111101111001110',' ':'000000000000000','.':'000000000000010',
+'+':'000010111010000','-':'000000111000000',':':'000010000010000','/':'001001010100100','!':'010010010000010'};
+const textW=(s,sc=1)=>(s.length*4-1)*sc;
+function drawText(g,s,x,y,col,sc=1){
+  g.fillStyle=col;
+  for(let k=0;k<s.length;k++){const gl=GL[s[k]]||GL[' '];
+    for(let r=0;r<5;r++)for(let c=0;c<3;c++)if(gl[r*3+c]==='1')g.fillRect(x+(k*4+c)*sc,y+r*sc,sc,sc);}
+}
+
+// ================= shaders: banded "pixel" lighting + screen-door fade =================
+const LIGHT=new THREE.Vector3(-0.6,1.0,0.5).normalize(); // view space: every sprite lit from upper-left
+const VERT=`varying vec3 vN;void main(){vN=normalize(normalMatrix*normal);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`;
+const FRAG_LIT=`uniform vec3 uColor;uniform vec3 uLight;uniform float uSteps;uniform float uOpacity;uniform float uFlash;uniform float uRim;varying vec3 vN;
+void main(){
+  if(uOpacity<0.99&&mod(floor(gl_FragCoord.x)+floor(gl_FragCoord.y),2.0)<0.5)discard;
+  float t=clamp(dot(normalize(vN),uLight)*0.5+0.5,0.,1.);
+  t=clamp(floor(t*uSteps)/(uSteps-1.),0.,1.);
+  vec3 shadow=mix(uColor*0.3,vec3(0.05,0.03,0.14),0.45);
+  vec3 c=mix(shadow,uColor*0.8,t);
+  if(t>=0.999)c=mix(uColor,vec3(0.78,0.86,1.0),uRim);
+  gl_FragColor=vec4(mix(c,vec3(1.),uFlash),1.);
+}`;
+const VERT_E=`void main(){gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`;
+const FRAG_E=`uniform vec3 uColor;uniform float uOpacity;
+void main(){if(uOpacity<0.99&&mod(floor(gl_FragCoord.x)+floor(gl_FragCoord.y),2.0)<0.5)discard;gl_FragColor=vec4(uColor,1.);}`;
+function litMat(hex,rim=0.35,side=THREE.FrontSide){
+  return new THREE.ShaderMaterial({vertexShader:VERT,fragmentShader:FRAG_LIT,side,uniforms:{
+    uColor:{value:new THREE.Color(hex)},uLight:{value:LIGHT},uSteps:{value:3},uOpacity:{value:1},uFlash:{value:0},uRim:{value:rim}}});
+}
+function emitMat(hex,side=THREE.FrontSide){
+  return new THREE.ShaderMaterial({vertexShader:VERT_E,fragmentShader:FRAG_E,side,uniforms:{uColor:{value:new THREE.Color(hex)},uOpacity:{value:1}}});
+}
+
+// ================= renderer + iso camera =================
+const glCanvas=$('gl'),ov=$('ov'),og=ov.getContext('2d');
+const renderer=new THREE.WebGLRenderer({canvas:glCanvas,antialias:false});
+renderer.setPixelRatio(1);renderer.setScissorTest(true);
+const scene=new THREE.Scene();
+const PITCH=THREE.MathUtils.degToRad(30),YAW=THREE.MathUtils.degToRad(45);
+const DIR=new THREE.Vector3(Math.cos(PITCH)*Math.sin(YAW),Math.sin(PITCH),Math.cos(PITCH)*Math.cos(YAW));
+const cam=new THREE.OrthographicCamera(-1,1,1,-1,0.1,1400);
+cam.position.copy(DIR);cam.lookAt(0,0,0);cam.updateMatrixWorld();
+const RIGHT=new THREE.Vector3(1,0,0).applyQuaternion(cam.quaternion);
+const UP=new THREE.Vector3(0,1,0).applyQuaternion(cam.quaternion);
+// Place the camera so (R,U) in screen-basis is centred, snapped to whole pixels to stop shimmer.
+function setCam(R,U,halfH,vw,vh){
+  const s=2*halfH/vh;
+  R=Math.round(R/s)*s;U=Math.round(U/s)*s;
+  const halfW=halfH*vw/vh;
+  cam.left=-halfW;cam.right=halfW;cam.top=halfH;cam.bottom=-halfH;cam.updateProjectionMatrix();
+  cam.position.copy(RIGHT).multiplyScalar(R).addScaledVector(UP,U).addScaledVector(DIR,600);
+  cam.updateMatrixWorld();
+  return s;
+}
+
+// ================= track =================
+const CTRL=[[0,-35],[36,-34],[50,-28],[54,-14],[52,2],[44,12],[30,14],[22,6],[14,14],[16,28],[4,36],[-14,34],
+  [-26,24],[-40,30],[-52,22],[-54,4],[-46,-8],[-54,-22],[-50,-32],[-40,-34]];
+const curve=new THREE.CatmullRomCurve3(CTRL.map(([x,z])=>new THREE.Vector3(x*TRACK_SCALE,0,z*TRACK_SCALE)),true,'centripetal');
+const L=curve.getLength(),N=Math.round(L/0.5),DS=L/N;
+const P=curve.getSpacedPoints(N);P.length=N;
+const T=[],NRM=[],K=[],KA=[];
+for(let i=0;i<N;i++){const t=P[(i+1)%N].clone().sub(P[mod(i-1,N)]).normalize();T.push(t);NRM.push(new THREE.Vector3(-t.z,0,t.x));}
+for(let i=0;i<N;i++)K.push(T[(i+1)%N].clone().sub(T[i]).dot(NRM[i])/DS); // signed: + turns toward +lateral
+for(let i=0;i<N;i++){let a=0;for(let k=-4;k<=4;k++)a+=Math.abs(K[mod(i+k,N)]);KA.push(a/9);}
+// Tires wear faster through corners; normalise so a set lasts TIRE_LAPS on STD.
+const cornerLoad=i=>1+Math.min(1.5,KA[i]*15);
+const avgLoad=KA.reduce((a,_,i)=>a+cornerLoad(i),0)/N;
+const FUEL_PER_UNIT=100/(TANK_LAPS*L),TIRE_PER_UNIT=100/(TIRE_LAPS*L*avgLoad);
+
+function ribbon(i0,i1,o0,o1,y){
+  const pos=[],idx=[],nor=[];let n=0;
+  for(let k=i0;k<=i1;k++){const i=mod(k,N),p=P[i],m=NRM[i];
+    pos.push(p.x+m.x*o0,y,p.z+m.z*o0,p.x+m.x*o1,y,p.z+m.z*o1);nor.push(0,1,0,0,1,0);
+    if(n>0){const a=(n-1)*2;idx.push(a,a+2,a+1,a+1,a+2,a+3);}n++;}
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  g.setAttribute('normal',new THREE.Float32BufferAttribute(nor,3));g.setIndex(idx);return g;
+}
+scene.add(new THREE.Mesh(ribbon(0,N,-HW,HW,0.02),litMat('#2e2652',0,THREE.DoubleSide)));
+for(let s=0;s<3;s++){
+  const i0=Math.round(s*N/3),i1=Math.round((s+1)*N/3),m=emitMat(SECTOR_COLORS[s],THREE.DoubleSide);
+  scene.add(new THREE.Mesh(ribbon(i0,i1,HW-0.45,HW,0.05),m));
+  scene.add(new THREE.Mesh(ribbon(i0,i1,-HW,-HW+0.45,0.05),m));
+}
+const dashMat=emitMat('#4a3d78',THREE.DoubleSide);
+for(let i=0;i<N;i+=12)scene.add(new THREE.Mesh(ribbon(i,i+4,-0.1,0.1,0.04),dashMat));
+const chkW=emitMat('#f4ecff',THREE.DoubleSide),chkB=emitMat('#0b0716',THREE.DoubleSide);
+for(let r=0;r<2;r++)for(let c=0;c<8;c++){const o0=-HW+c*(2*HW/8);
+  scene.add(new THREE.Mesh(ribbon(r*2,r*2+2,o0,o0+2*HW/8,0.045),(r+c)%2?chkW:chkB));}
+
+// ================= pit lane: outside the start/finish straight =================
+// Positions along the pit lane are measured as distance past the pit entry (PIT_IN).
+const PIT_HALF=40,PIT_IN=L-PIT_HALF,PIT_LEN=2*PIT_HALF,PIT_LAT=-(HW+4.2),PIT_SPEED=20;
+const boxRel=(team,slot)=>PIT_HALF+(TEAMS.indexOf(team)-(TEAMS.length-1)/2)*6.5-slot*2.8;
+{
+  const i0=Math.round(PIT_IN/DS),i1=Math.round((L+PIT_HALF)/DS),lane=litMat('#1d1834',0,THREE.DoubleSide);
+  scene.add(new THREE.Mesh(ribbon(i0,i1,PIT_LAT-2.2,PIT_LAT+2.2,0.02),lane));
+  scene.add(new THREE.Mesh(ribbon(i0,i0+10,PIT_LAT+2.2,-HW,0.02),lane));   // entry road
+  scene.add(new THREE.Mesh(ribbon(i1-10,i1,PIT_LAT+2.2,-HW,0.02),lane));   // exit road
+  scene.add(new THREE.Mesh(ribbon(i0+12,i1-12,-HW-1.1,-HW-0.8,0.06),emitMat('#8a6a1a',THREE.DoubleSide))); // pit wall
+  TEAMS.forEach(t=>{const k=Math.round((PIT_IN+boxRel(t,0))/DS);
+    scene.add(new THREE.Mesh(ribbon(k-7,k+3,PIT_LAT-1.9,PIT_LAT+1.9,0.03),
+      emitMat('#'+new THREE.Color(t.body).multiplyScalar(0.35).getHexString(),THREE.DoubleSide)));});
+}
+
+// ================= city hints: canal, freeway, one landmark =================
+const CANAL=[-6,0];
+const groundMat=litMat('#110b20',0);
+const gN=new THREE.Mesh(new THREE.BoxGeometry(460,1,220+CANAL[0]),groundMat);gN.position.set(0,-0.5,(-220+CANAL[0])/2);scene.add(gN);
+const gS=new THREE.Mesh(new THREE.BoxGeometry(460,1,220-CANAL[1]),groundMat);gS.position.set(0,-0.5,(220+CANAL[1])/2);scene.add(gS);
+const water=new THREE.Mesh(new THREE.PlaneGeometry(460,CANAL[1]-CANAL[0]),emitMat('#0a2530'));
+water.rotation.x=-Math.PI/2;water.position.set(0,-0.55,(CANAL[0]+CANAL[1])/2);scene.add(water);
+const glints=[],glintGeo=new THREE.BoxGeometry(0.9,0.05,0.2),glintMat=emitMat('#2f95a8');
+for(let i=0;i<60;i++){const m=new THREE.Mesh(glintGeo,glintMat);m.position.set(rand(-140,140),-0.5,rand(CANAL[0]+0.5,CANAL[1]-0.5));m.userData.v=rand(0.6,1.6);scene.add(m);glints.push(m);}
+
+function nearTrack(x,z,r){for(let i=0;i<N;i+=2){const dx=P[i].x-x,dz=P[i].z-z;if(dx*dx+dz*dz<r*r)return true;}return false;}
+const occluders=[];
+function registerOccluder(group){
+  group.updateMatrixWorld(true);
+  const o={mats:[],minR:1e9,maxR:-1e9,minU:1e9,maxU:-1e9,maxD:-1e9},v=new THREE.Vector3();
+  group.traverse(m=>{
+    if(!m.isMesh)return;
+    if(m.material.uniforms&&m.material.uniforms.uOpacity&&!o.mats.includes(m.material))o.mats.push(m.material);
+    m.geometry.computeBoundingBox();const b=m.geometry.boundingBox;
+    for(let c=0;c<8;c++){v.set(c&1?b.max.x:b.min.x,c&2?b.max.y:b.min.y,c&4?b.max.z:b.min.z).applyMatrix4(m.matrixWorld);
+      const R=v.dot(RIGHT),U=v.dot(UP),D=v.dot(DIR);
+      o.minR=Math.min(o.minR,R);o.maxR=Math.max(o.maxR,R);o.minU=Math.min(o.minU,U);o.maxU=Math.max(o.maxU,U);o.maxD=Math.max(o.maxD,D);}
+  });
+  occluders.push(o);
+}
+
+// Elevated freeway on pillars, one occluder per span so only the span over a car fades.
+const FW_A=new THREE.Vector3(-140,0,-75),FW_B=new THREE.Vector3(140,0,65),FW_Y=5,SPAN=14;
+const fwDir=FW_B.clone().sub(FW_A),fwLen=fwDir.length();fwDir.normalize();
+const fwPerp=new THREE.Vector3(-fwDir.z,0,fwDir.x),fwRot=-Math.atan2(fwDir.z,fwDir.x);
+const slabGeo=new THREE.BoxGeometry(SPAN,0.7,5),pillarGeo=new THREE.BoxGeometry(1,FW_Y,1),railGeo=new THREE.BoxGeometry(SPAN,0.25,0.2);
+for(let u=0;u<fwLen;u+=SPAN){
+  const g=new THREE.Group(),mid=FW_A.clone().addScaledVector(fwDir,u+SPAN/2),start=FW_A.clone().addScaledVector(fwDir,u);
+  const slabMat=litMat('#241c3c',0.2),railMat=emitMat('#7a4a1a');
+  const slab=new THREE.Mesh(slabGeo,slabMat);slab.position.set(mid.x,FW_Y,mid.z);slab.rotation.y=fwRot;g.add(slab);
+  for(const side of[-1,1]){const r=new THREE.Mesh(railGeo,railMat);r.position.set(mid.x+fwPerp.x*2.4*side,FW_Y+0.45,mid.z+fwPerp.z*2.4*side);r.rotation.y=fwRot;g.add(r);}
+  const inCanal=start.z>CANAL[0]-1&&start.z<CANAL[1]+1;
+  if(!inCanal&&!nearTrack(start.x,start.z,HW+2)){const p=new THREE.Mesh(pillarGeo,slabMat);p.position.set(start.x,FW_Y/2,start.z);g.add(p);}
+  scene.add(g);registerOccluder(g);
+  const end=FW_A.clone().addScaledVector(fwDir,Math.min(fwLen,u+SPAN)).setY(FW_Y),st=start.clone().setY(FW_Y);
+  occluders[occluders.length-1].seg=[st.dot(RIGHT),st.dot(UP),end.dot(RIGHT),end.dot(UP)];
+}
+const traffic=[],dotGeo=new THREE.BoxGeometry(0.9,0.3,0.5);
+const dotW=emitMat('#fff5d6'),dotR=emitMat('#ff4060');
+for(let i=0;i<22;i++){const fwd=i%2===0,m=new THREE.Mesh(dotGeo,fwd?dotW:dotR);m.rotation.y=fwRot;
+  m.userData={u:Math.random(),v:(fwd?1:-1)*rand(14,22)/fwLen,lane:fwd?1.4:-1.4};scene.add(m);traffic.push(m);}
+
+// Landmark: a megacorp tower with a neon halo.
+const TOWER_POS=new THREE.Vector3(-8*TRACK_SCALE,0,16*TRACK_SCALE);
+(function(){
+  const g=new THREE.Group(),m=litMat('#2c2452',0.3);
+  const box=(w,h,d,y,mat=m)=>{const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);o.position.y=y;g.add(o);return o;};
+  box(10,3,10,1.5);box(7,16,7,11);box(5,6,5,22);box(0.4,5,0.4,27.5);
+  const win=emitMat('#2fb8d6');
+  for(const o of[-2,0,2]){const a=new THREE.Mesh(new THREE.BoxGeometry(0.1,13,0.5),win);a.position.set(3.55,11,o);g.add(a);
+    const b=new THREE.Mesh(new THREE.BoxGeometry(0.5,13,0.1),win);b.position.set(o,11,3.55);g.add(b);}
+  const halo=new THREE.Mesh(new THREE.TorusGeometry(5.2,0.35,4,16),emitMat('#ff2e88'));halo.rotation.x=Math.PI/2;halo.position.y=20.5;g.add(halo);
+  const beacon=new THREE.Mesh(new THREE.BoxGeometry(0.7,0.7,0.7),emitMat('#ffd23f'));beacon.position.y=30.2;g.add(beacon);
+  g.position.copy(TOWER_POS);scene.add(g);registerOccluder(g);
+})();
+
+// Points the full-track camera must fit: the circuit and the tower.
+const FIT={minR:1e9,maxR:-1e9,minU:1e9,maxU:-1e9};
+[...P.filter((_,i)=>i%6===0),TOWER_POS.clone().setY(31)].forEach(p=>{const R=p.dot(RIGHT),U=p.dot(UP);
+  FIT.minR=Math.min(FIT.minR,R-HW);FIT.maxR=Math.max(FIT.maxR,R+HW);FIT.minU=Math.min(FIT.minU,U-HW);FIT.maxU=Math.max(FIT.maxU,U+HW);});
+
+// ================= cars: low-poly buggy from Sprite Forge + gun + side armour =================
+const GEO={chassis:new THREE.BoxGeometry(1.7,0.35,0.9),cabin:new THREE.BoxGeometry(0.6,0.28,0.7),stripe:new THREE.BoxGeometry(1.7,0.12,0.24),
+  glass:new THREE.BoxGeometry(0.5,0.22,0.5),helm:new THREE.SphereGeometry(0.16,6,5),wing:new THREE.BoxGeometry(0.3,0.05,1.0),
+  strut:new THREE.BoxGeometry(0.06,0.4,0.06),bumper:new THREE.BoxGeometry(0.5,0.2,0.3),wheel:new THREE.CylinderGeometry(0.28,0.28,0.24,8),
+  gunBase:new THREE.BoxGeometry(0.26,0.14,0.26),barrel:new THREE.BoxGeometry(0.55,0.12,0.12),plate:new THREE.BoxGeometry(0.8,0.24,0.06),
+  head:new THREE.BoxGeometry(0.05,0.1,0.14),tail:new THREE.BoxGeometry(0.05,0.1,0.18)};
+Object.values(GEO).forEach(g=>g.computeBoundingBox());
+const SH={tyre:litMat('#2a2a2a'),dark:litMat('#1a1a1a'),glass:litMat('#9be0ff'),helm:litMat('#ffffff'),head:emitMat('#fff3b0'),tail:emitMat('#ff2040')};
+const OL_BLACK=new THREE.MeshBasicMaterial({color:0x000000,side:THREE.BackSide});
+const OL_YOU=new THREE.MeshBasicMaterial({color:0xc8fdff,side:THREE.BackSide});
+const coneGeo=new THREE.BufferGeometry();
+coneGeo.setAttribute('position',new THREE.Float32BufferAttribute([1.1,0.05,0.3,4.6,0.05,1.3,4.6,0.05,-1.3,1.1,0.05,0.3,4.6,0.05,-1.3,1.1,0.05,-0.3],3));
+const coneMat=new THREE.MeshBasicMaterial({color:0xfff0a0,transparent:true,opacity:0.12,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
+
+function buildCar(team){
+  const body=litMat(team.body),trim=litMat(team.trim),model=new THREE.Group(),outlines=[],olMat=team.you?OL_YOU:OL_BLACK;
+  const add=(geo,mat,x,y,z,rx=0,ol=true)=>{
+    const o=new THREE.Mesh(geo,mat);o.position.set(x,y,z);o.rotation.x=rx;model.add(o);
+    if(ol){const h=new THREE.Mesh(geo,olMat);h.position.copy(o.position);h.rotation.copy(o.rotation);model.add(h);
+      const b=geo.boundingBox;outlines.push({h,dx:b.max.x-b.min.x,dy:b.max.y-b.min.y,dz:b.max.z-b.min.z});}
+  };
+  add(GEO.chassis,body,0,0.42,0);add(GEO.cabin,body,-0.1,0.72,0);add(GEO.stripe,trim,0,0.62,0);
+  add(GEO.glass,SH.glass,0.15,0.85,0);add(GEO.helm,SH.helm,-0.2,0.98,0);
+  add(GEO.wing,SH.dark,-0.85,0.95,0);add(GEO.strut,SH.dark,-0.8,0.75,0.3);add(GEO.strut,SH.dark,-0.8,0.75,-0.3);
+  add(GEO.bumper,trim,0.9,0.4,0);
+  [[0.6,0.52],[0.6,-0.52],[-0.6,0.52],[-0.6,-0.52]].forEach(([x,z])=>add(GEO.wheel,SH.tyre,x,0.28,z,Math.PI/2));
+  add(GEO.gunBase,SH.dark,-0.05,0.93,-0.28);add(GEO.barrel,SH.dark,0.28,0.98,-0.28);
+  add(GEO.plate,trim,0.05,0.45,0.48);add(GEO.plate,trim,0.05,0.45,-0.48);
+  add(GEO.head,SH.head,0.86,0.45,0.33,0,false);add(GEO.head,SH.head,0.86,0.45,-0.33,0,false);
+  add(GEO.tail,SH.tail,-0.86,0.5,0.32,0,false);add(GEO.tail,SH.tail,-0.86,0.5,-0.32,0,false);
+  model.add(new THREE.Mesh(coneGeo,coneMat));
+  model.scale.setScalar(CAR_SCALE);
+  const yawG=new THREE.Group();yawG.add(model);const root=new THREE.Group();root.add(yawG);scene.add(root);
+  return {root,yawG,body,trim,outlines};
+}
+
+const cars=[];
+TEAMS.forEach(team=>team.drivers.forEach((name,k)=>{
+  const c={team,name,you:!!team.you,slot:k,...buildCar(team),pos:new THREE.Vector3()};cars.push(c);
+}));
+const mine=[cars[0],cars[1]];
+const league={season:1,race:1,review:null,lastReg:null};
+TEAMS.forEach(t=>{
+  t.cash=t.you?1.5:rand(1,3);t.parts={};
+  const base=57+(t.pace||0)*5+(t.you?0:rand(-3,3));
+  PARTS.forEach(p=>t.parts[p.id]={level:Math.round(base+rand(-3,3)),dev:0});
+  if(!t.you)t.mgr={business:choice(MGR_TIERS),tactics:choice(MGR_TIERS)};
+});
+cars.forEach(c=>{c.cond={};PARTS.forEach(p=>c.cond[p.id]=100);c.condStart={...c.cond};
+  c.drv=YOUR_DRIVERS[c.name]||rollDriver(c.team);c.abOn={};});
+// Tunnel sectors: the stretches of track under the freeway overpass.
+const TUNNEL=P.map(p=>Math.abs((p.x-FW_A.x)*fwDir.z-(p.z-FW_A.z)*fwDir.x)<4.5);
+const fieldMedian=id=>{const v=TEAMS.map(t=>t.parts[id].level).sort((a,b)=>a-b);return (v[4]+v[5])/2;};
+
+// ================= effects pools =================
+const smoke=[],smokeGeo=new THREE.BoxGeometry(1,1,1),smokeMats=[new THREE.MeshBasicMaterial({color:0x5a5470}),new THREE.MeshBasicMaterial({color:0x3d3850})];
+for(let i=0;i<180;i++){const m=new THREE.Mesh(smokeGeo,smokeMats[i%2]);m.visible=false;scene.add(m);smoke.push({m,life:0,max:1});}
+const sparks=[],sparkGeo=new THREE.BoxGeometry(0.6,0.6,0.6),sparkMats=[emitMat('#ffe066'),emitMat('#ff7a1f')];
+for(let i=0;i<40;i++){const m=new THREE.Mesh(sparkGeo,sparkMats[i%2]);m.visible=false;scene.add(m);sparks.push({m,life:0});}
+const tracers=[];
+for(let i=0;i<60;i++){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute([0,0,0,0,0,0],3));
+  const l=new THREE.Line(g,new THREE.LineBasicMaterial({color:0xffe066}));l.visible=false;l.frustumCulled=false;scene.add(l);tracers.push({l,life:0});}
+const mines=[],mineGeo=new THREE.BoxGeometry(0.8,0.35,0.8),mineMat=emitMat('#ff3b3b');
+for(let i=0;i<48;i++){const m=new THREE.Mesh(mineGeo,mineMat);m.visible=false;scene.add(m);mines.push({m,active:false});}
+const pick=(pool,test)=>pool.find(test)||pool[0];
+
+// ================= race state =================
+const race={t:-3,over:false,resultShown:false,overAt:0,ready:false};
+const feedItems=[];
+function say(text,cls=''){
+  const lap=Math.min(LAPS,Math.max(1,Math.floor(Math.max(0,leader().d)/L)+1));
+  feedItems.unshift({text,cls,lap});feedItems.length=Math.min(feedItems.length,7);
+  $('feed').innerHTML=feedItems.map(f=>`<li class="${f.cls}"><span>L${f.lap}</span>${f.text}</li>`).join('');
+}
+function resetRace(){
+  race.t=-3;race.over=false;race.resultShown=false;$('result').hidden=true;race.ready=tuneDone;
+  cars.forEach(c=>{c.spinSaved=false;c.armorLap=-1;});
+  $('restart').disabled=false;[4,6,10,15].forEach(n=>$('l'+n).disabled=false);
+  // Random grid until qualifying exists.
+  const grid=cars.map((_,k)=>k).sort(()=>Math.random()-0.5);
+  cars.forEach((c,ci)=>{
+    const k=grid[ci];
+    Object.assign(c,{d:-3-Math.floor(k/2)*4.2,lat:k%2?-1.4:1.4,latT:0,v:0,dur:100,state:'race',finishT:0,passT:0,passSide:1,
+      fireCd:rand(1,3),mines:c.team.mines||1,spin:0,spinA:0,flash:0,lastHitMsg:-9,lastPos:k+1,
+      top:(31.5+(c.team.pace||0))*statMul(c.drv.stats.pace,0.0015)*(1+(c.team.mgr?TACTICS_PACE[c.team.mgr.tactics]:0)),
+      grip:94*statMul(c.drv.stats.pace,0.001),acc:13.5,armor:c.team.armor||1,abOn:{},abSaid:{},
+      fuel:100,tire:100,ammo:AMMO,warn:{},pit:null,boxReq:false,stops:0,pitFuel:c.you?c.pitFuel!==false:true,pitCompound:c.you?(c.pitCompound||'medium'):'medium',
+      compound:c.you?(c.startCompound||'medium'):({attack:'soft',stretch:'hard'}[c.team.plan]||'medium'),
+      orders:c.you&&c.orders?c.orders:{fuel:'std',tires:'std',guns:c.team.guns||'std'}});
+    c.latT=c.lat;c.cond={...c.condStart};c.failed={};
+    c.body.uniforms.uColor.value.set(c.team.body);c.trim.uniforms.uColor.value.set(c.team.trim);
+  });
+  cars.forEach(c=>{c.lastPos=standings().indexOf(c)+1;});
+  mines.forEach(m=>{m.active=false;m.m.visible=false;});
+  smoke.forEach(s=>{s.life=0;s.m.visible=false;});
+  feedItems.length=0;$('feed').innerHTML='';
+  say('Race control: grid is set. Lights in 3.');
+  if(league.review)say(`Rules committee reviewing ${league.review.map(id=>id.toUpperCase()).join(' and ')} for next season.`,'bad');
+  updateHeader();
+}
+function updateHeader(){
+  $('trackTags').textContent=`(${TRACK.tags.join(', ')})`;
+  $('seasonTxt').textContent=`Season ${league.season} · Race ${league.race}/${RACES_PER_SEASON}`;
+  $('cashTxt').textContent=fmtQT(TEAMS[0].cash);
+}
+function standings(){
+  const key=c=>c.state==='done'?[0,c.finishT]:c.state==='wreck'?[2,-c.d]:[1,-c.d];
+  return cars.slice().sort((a,b)=>{const x=key(a),y=key(b);return x[0]-y[0]||x[1]-y[1];});
+}
+const leader=()=>standings()[0];
+
+function tracer(from,to,col){
+  const tr=pick(tracers,t=>t.life<=0),a=tr.l.geometry.attributes.position.array;
+  a[0]=from.x;a[1]=from.y;a[2]=from.z;a[3]=to.x;a[4]=to.y;a[5]=to.z;
+  tr.l.geometry.attributes.position.needsUpdate=true;tr.l.material.color.set(col);tr.life=0.09;tr.l.visible=true;
+}
+function spark(p,big=false){
+  const n=big?6:2;
+  for(let k=0;k<n;k++){const s=pick(sparks,s=>s.life<=0);s.life=big?0.35:0.12;s.m.visible=true;
+    s.m.position.set(p.x+rand(-1,1)*(big?1.5:0.5),p.y+rand(0,1),p.z+rand(-1,1)*(big?1.5:0.5));s.m.scale.setScalar(big?1.6:1);}
+}
+function wreck(c,by,reason){
+  c.state='wreck';c.dur=0;c.latT=Math.sign(c.lat||1)*(HW+1.4);
+  c.body.uniforms.uColor.value.set('#2a2030');c.trim.uniforms.uColor.value.set('#3a2a36');
+  spark(c.pos,true);
+  if(reason)say(c.you?`${c.name}: ${reason}! Car's done. DNF.`:`${c.name} (${c.team.name}) out: ${reason.toLowerCase()}.`,c.you?'bad':'');
+  else say(c.you?`${c.name}: I'm out, car's dead. DNF.`:`${c.name} (${c.team.name}) wrecked${by?` by ${by.name}`:''}.`,c.you?'bad':'');
+}
+function damage(c,amount,src,why){
+  if(c.state==='wreck')return;
+  // Body plating soaks damage: a better, fresher body means less harm; a torn-off body takes 30% more.
+  const plating=partF(c.team.parts.body.level,c.cond.body)*(c.failed.body?1/1.3:1);
+  let nerve=statMul(c.drv.stats.composure,-0.008)*(why==='gun'&&has(c,'cool')?0.75:1)*(1+(1-tuneShare(c,'armor'))*0.67);
+  // Golden armor tune: the first hit each lap does half damage.
+  const lapNow=Math.floor(Math.max(0,c.d)/L);if(golden(c,'armor')&&c.armorLap!==lapNow){c.armorLap=lapNow;nerve*=0.5;}
+  if(why==='gun'&&has(c,'cool'))c.abOn.cool=1;
+  c.dur=Math.max(0,c.dur-amount*c.armor*nerve/plating);c.flash=1;
+  // Hits also chew up a part: a mine hits the chassis, gunfire mostly hits the body.
+  const part=why==='mine'?'chassis':Math.random()<0.6?'body':choice(PARTS).id;c.cond[part]=Math.max(0,c.cond[part]-amount*0.8);
+  if(c.you&&why==='gun'&&race.t-c.lastHitMsg>6){c.lastHitMsg=race.t;say(`${c.name}: taking fire from ${src.name}!`,'you');}
+  if(c.dur<=0)wreck(c,src);
+}
+function fire(c,t){
+  c.ammo=Math.max(0,c.ammo-BURST);c.cond.weapons=Math.max(0,c.cond.weapons-0.25);
+  // A worn weapons package jams; a better one hits more often.
+  if(!has(c,'deadeye')&&!golden(c,'weapons')&&c.cond.weapons<30&&Math.random()<(30-c.cond.weapons)/60){
+    if(c.you&&race.t-(c.lastJam||-9)>6){c.lastJam=race.t;say(`${c.name}: guns jammed!`,'bad');}
+    return;
+  }
+  const wF=partF(c.team.parts.weapons.level,c.cond.weapons);
+  const aim=statMul(c.drv.stats.gunnery,0.01)*(c.abOn.hunter?1.1:1)*(has(c,'deadeye')?1.05:1)*
+    tuneShare(c,'weapons')*(golden(c,'weapons')?1.1:1);
+  if(has(c,'deadeye'))c.abOn.deadeye=1;
+  const from=c.pos.clone().setY(1.15*CAR_SCALE),hit=Math.random()<ORDERS.guns.opts[c.orders.guns].acc*wF*aim;
+  const to=t.pos.clone().setY(0.65*CAR_SCALE);if(!hit)to.add(new THREE.Vector3(rand(-2.5,2.5),0,rand(-2.5,2.5)));
+  tracer(from,to,c.you?'#2ef2ff':'#ffe066');
+  if(hit){spark(to);damage(t,rand(1,2.2),c,'gun');}
+}
+function dropMine(c){
+  const m=mines.find(m=>!m.active);if(!m)return;
+  Object.assign(m,{active:true,arm:0.8,age:0,owner:c});m.m.visible=true;m.m.position.copy(c.pos).setY(0.2);
+  c.mines--;if(c.you)say(`${c.name}: mine's out.`,'you');
+}
+
+// Fuel left at the flag if the car keeps its current fuel order (negative = runs dry).
+function fuelBurn(c,mode=c.orders.fuel){
+  return ORDERS.fuel.opts[mode].burn*statMul(c.drv.stats.fuel,-0.006)*(mode==='lean'&&has(c,'miser')?0.85:1);
+}
+function tireWear(c,mode=c.orders.tires,cmp=c.compound){
+  return ORDERS.tires.opts[mode].wear*COMPOUNDS[cmp].wear*statMul(c.drv.stats.tires,-0.01)*(mode==='push'&&has(c,'tirewhisper')?0.65:1);
+}
+// Laps a fresh set of a compound lasts for this driver on this track.
+const tireLifeLaps=(c,cmp,mode='std')=>100/(TIRE_PER_UNIT*avgLoad*L*tireWear(c,mode,cmp));
+// AI (and the default suggestion): the softest compound that reaches the flag, otherwise hards.
+function bestCompound(c){
+  const lapsLeft=Math.max(0,LAPS*L-c.d)/L;
+  return CMP_ORDER.find(k=>tireLifeLaps(c,k,c.orders.tires)>=lapsLeft*1.05)||'hard';
+}
+function fuelAtFlag(c){return c.fuel-Math.max(0,LAPS*L-c.d)*FUEL_PER_UNIT*fuelBurn(c);}
+// AI strategies: HEXADYNE attacks on RICH/PUSH with one stop, JACKALS one-stop on STD, KOBRA stretches it with no stop.
+// Tire % a car will still use before the flag on a given tire order.
+const tireNeed=(c,mode)=>Math.max(0,LAPS*L-c.d)*TIRE_PER_UNIT*avgLoad*tireWear(c,mode);
+// AI strategies come from each team's plan (see TEAMS). Everyone boxes when fuel or tires can't reach the flag.
+function aiOrders(c){
+  const remain=LAPS*L-c.d;
+  if(c.team.plan==='attack'){c.orders.fuel='rich';c.orders.tires='push';}
+  else if(c.team.plan==='stretch'){
+    const need=Math.max(0,remain)*FUEL_PER_UNIT;
+    // Stretch only when the tank can reach the flag on LEAN; otherwise run STD and stop.
+    const canStretch=c.fuel>=need*ORDERS.fuel.opts.lean.burn;
+    c.orders.fuel=!canStretch?'std':c.fuel<need*1.01?'lean':c.fuel>need*ORDERS.fuel.opts.rich.burn+3?'rich':'std';
+    c.orders.tires=c.tire>=tireNeed(c,'save')&&c.tire<tireNeed(c,'std')*1.05?'save':'std';
+  }
+  if(c.boxReq||c.pit||remain<L)return;
+  const lapFuel=L*FUEL_PER_UNIT*fuelBurn(c);
+  if((fuelAtFlag(c)<0&&c.fuel<lapFuel*1.4)||(c.tire<25&&c.tire<tireNeed(c,c.orders.tires))){c.boxReq=true;c.pitCompound=bestCompound(c);}
+}
+// Refuel adds enough to reach the flag on RICH (+3%), so a stop buys the right to push.
+const fuelTarget=c=>Math.min(100,Math.max(0,LAPS*L-c.d)*FUEL_PER_UNIT*fuelBurn(c,'rich')+3);
+function enterPit(c){
+  c.pit={phase:'lane',box:boxRel(c.team,c.slot),t:0,total:0,add:0};
+  say(c.you?`${c.name} in the pit lane.`:`${c.name} (${c.team.name}) pits.`,c.you?'you':'');
+}
+function startService(c){
+  c.pit.add=c.pitFuel?Math.max(0,fuelTarget(c)-c.fuel):0;
+  c.pit.t=c.pit.total=(1+c.pit.add/15+(c.pitCompound!=='none'?1.5:0))*(has(c,'pitwhisper')?0.7:1);
+  if(has(c,'pitwhisper'))c.abOn.pitwhisper=2;
+  c.pit.phase='stop';c.v=0;
+}
+function finishService(c){
+  c.fuel+=c.pit.add;if(c.pitCompound!=='none'){c.tire=100;c.compound=c.pitCompound;}
+  c.pit.phase='out';c.boxReq=false;c.warn={};c.stops++;
+  if(c.you){const did=[c.pit.add>0.5?`+${Math.round(c.pit.add)}% fuel`:'',c.pitCompound!=='none'?`fresh ${COMPOUNDS[c.pitCompound].label.toLowerCase()}s`:''].filter(Boolean).join(', ')||'no service';
+    say(`${c.name}: ${c.pit.total.toFixed(1)}s stop, ${did}. Go!`,'you');}
+}
+function radioWarnings(c){
+  const w=c.warn,dry=fuelAtFlag(c)<0;
+  if(dry&&!w.fuel)say(`${c.name}: fuel won't make the flag on ${ORDERS.fuel.opts[c.orders.fuel].label}.`,'bad');
+  w.fuel=dry;
+  if(c.tire<30&&!w.tire){w.tire=true;say(`${c.name}: tires are going off, grip's fading.`,'bad');}
+  if(c.ammo<=0&&!w.ammo){w.ammo=true;say(`${c.name}: guns dry, out of rounds.`,'bad');}
+  if(c.fuel<=0&&!w.empty){w.empty=true;say(`${c.name}: tank's empty! Crawling home.`,'bad');}
+}
+function stepSim(dt){
+  race.t+=dt;
+  if(race.t<0)return;
+  const order=standings(),posOf=new Map(order.map((c,k)=>[c,k+1]));
+  for(const c of cars){
+    const F=ORDERS.fuel.opts[c.orders.fuel],TI=ORDERS.tires.opts[c.orders.tires],G=ORDERS.guns.opts[c.orders.guns];
+    // abOn: abilities active right now (value = seconds to keep the chip lit)
+    for(const k in c.abOn)if((c.abOn[k]-=dt)<=0)delete c.abOn[k];
+    if(c.state==='wreck'){c.v=Math.max(0,c.v-30*dt);c.lat+=(c.latT-c.lat)*Math.min(1,dt*2);c.d+=c.v*dt;continue;}
+    const i=Math.floor(mod(c.d,L)/DS)%N,tp=c.team.parts;
+    const engF=partF(tp.engine.level,c.cond.engine),chF=partF(tp.chassis.level,c.cond.chassis),bdF=partF(tp.body.level,c.cond.body);
+    // ---- passive driver abilities ----
+    const pos=posOf.get(c),lit=id=>{c.abOn[id]=Math.max(c.abOn[id]||0,0.3);return true;};
+    let paceMul=1,gripMul=1,accMul=1;
+    if(TUNNEL[i]){if(has(c,'tunnel'))lit('tunnel');else paceMul*=0.96;}
+    if(TRACK.tags.includes('straights')&&has(c,'boulevard')&&lit('boulevard'))paceMul*=1.02;
+    if(TRACK.tags.includes('tight')&&has(c,'streetrat')&&lit('streetrat'))gripMul*=1.02;
+    if(c.state==='race'){
+      if(has(c,'front')&&pos<=3&&lit('front'))paceMul*=1.015;
+      if(has(c,'comeback')&&pos>10&&lit('comeback'))paceMul*=1.01;
+      if(has(c,'closer')&&c.d>=(LAPS-1)*L&&lit('closer'))paceMul*=1.03;
+      if(has(c,'rocket')&&race.t<10&&lit('rocket')){paceMul*=1.08;accMul*=1.08;}
+      if(has(c,'hunter')&&cars.some(o=>o!==c&&o.state==='race'&&o.d-c.d>0&&o.d-c.d<8)&&lit('hunter'))paceMul*=1.02;
+      if(has(c,'miser')&&c.orders.fuel==='lean')lit('miser');
+      if(has(c,'tirewhisper')&&c.orders.tires==='push')lit('tirewhisper');
+    }
+    const spd=c.orders.fuel==='lean'&&has(c,'miser')?1-(1-F.spd)/2:F.spd;
+    // ---- Night Tune grades ----
+    const tEng=tunePace(c,'engine'),tHnd=tunePace(c,'handling'),tAer=tunePace(c,'aero');
+    if(golden(c,'engine'))paceMul*=1.015;
+    if(golden(c,'aero')&&c.state==='race'&&cars.some(o=>o!==c&&o.state==='race'&&o.d-c.d>0&&o.d-c.d<8))paceMul*=1.02;
+    let vmax=c.top*spd*paceMul*tEng*Math.sqrt(tAer)*engF*Math.pow(bdF,0.3)*(0.82+0.18*c.dur/100);
+    if(c.fuel<=0)vmax*=0.45; // running on fumes
+    if(c.state==='done')vmax*=0.55;
+    const grip=c.grip*gripMul*paceMul*tHnd*Math.sqrt(tAer)*TI.grip*COMPOUNDS[c.compound].grip*chF*Math.sqrt(bdF)*(c.failed.body?0.8:1)*(0.6+0.4*c.tire/100); // worn tires cost real corner speed
+    let vt=vmax;
+    for(let k=0;k<=70;k+=5){const vc=Math.sqrt(grip/Math.max(KA[(i+k)%N],1e-3));const ok=Math.sqrt(vc*vc+2*BRAKE*k*DS);if(ok<vt)vt=ok;}
+    const rel=mod(mod(c.d,L)-PIT_IN,L);
+    if(c.boxReq&&!c.pit&&c.state==='race'&&c.d>0&&rel<6)enterPit(c);
+    let line;
+    if(c.pit){
+      line=PIT_LAT;vt=Math.min(vt,PIT_SPEED);
+      if(c.pit.phase==='lane'&&rel>=c.pit.box&&rel<PIT_LEN)startService(c);
+      if(c.pit.phase==='stop'){vt=0;c.v=0;c.pit.t-=dt;if(c.pit.t<=0)finishService(c);}
+      else if(c.pit.phase==='out'&&rel>=PIT_LEN&&rel<PIT_LEN+20)c.pit=null;
+    }else{
+      line=Math.max(-1.6,Math.min(1.6,K[(i+16)%N]*30)); // drift to the inside of the next corner
+      let ahead=null,gap=1e9;
+      for(const o of cars){if(o===c||o.state==='wreck'||o.pit)continue;const g=o.d-c.d;
+        if(g>0&&g<6&&Math.abs(o.lat-c.lat)<1.7&&g<gap){gap=g;ahead=o;}}
+      if(ahead){
+        const rc=c.drv.stats.racecraft+(has(c,'comeback')&&pos>10?15:0),rcA=ahead.drv.stats.racecraft;
+        const need=0.5-(rc-70)*0.015+(has(ahead,'wall')?1.5:0);   // speed edge needed to go for a pass
+        if(vt>ahead.v+need&&c.passT<=0){c.passT=1.3;c.passSide=ahead.lat>0?-1:1;}
+        else if(has(ahead,'wall')&&vt>ahead.v+0.5)ahead.abOn.wall=0.5;
+        if(gap<2*CAR_SCALE)vt=Math.min(vt,ahead.v-0.3+(rc-rcA)*0.01);
+      }
+      if(c.passT>0){c.passT-=dt;line=c.passSide*2.1;}
+    }
+    c.latT=line;
+    c.v+=Math.max(-BRAKE*dt,Math.min(c.acc*accMul*engF*dt,vt-c.v));
+    if(c.spin>0){c.spin-=dt;c.spinA+=dt*18;c.v=Math.min(c.v,8);}else c.spinA=0;
+    const dl=c.latT-c.lat;c.lat+=Math.sign(dl)*Math.min(Math.abs(dl),(c.pit?6:3*statMul(c.drv.stats.racecraft,0.01))*dt);
+    const dist=Math.max(0,c.v)*dt;c.d+=dist;
+    if(c.state==='race'){
+      c.fuel=Math.max(0,c.fuel-dist*FUEL_PER_UNIT*fuelBurn(c));
+      c.tire=Math.max(0,c.tire-dist*TIRE_PER_UNIT*tireWear(c)*cornerLoad(i));
+      const w=dist/L*WEAR_PER_LAP;
+      c.cond.engine=Math.max(0,c.cond.engine-w*F.burn);          // RICH works the engine harder
+      c.cond.chassis=Math.max(0,c.cond.chassis-w*Math.sqrt(TI.wear));
+      c.cond.body=Math.max(0,c.cond.body-w);
+      c.cond.weapons=Math.max(0,c.cond.weapons-w*0.5);
+      // Parts below 20% can fail. Engine or chassis failure ends the race; losing the body costs grip and plating.
+      for(const id of ['engine','chassis','body']){
+        const cd=c.cond[id];if(cd>=20||c.failed[id]||Math.random()>=(20-cd)*0.002*dt)continue;
+        c.failed[id]=true;
+        if(id==='body'){if(c.you)say(`${c.name}: bodywork's torn off, no plating left!`,'bad');}
+        else{wreck(c,null,id==='engine'?'Engine failure':'Chassis failure');break;}
+      }
+      if(c.state==='wreck')continue;
+    }
+    if(c.state==='race'&&c.d>=LAPS*L){c.state='done';c.finishT=race.t;
+      const p=standings().indexOf(c)+1;if(p===1)say(`${c.name} takes the flag for ${c.team.name}.`,c.you?'you':'');
+      else if(c.you)say(`${c.name} home in P${p}.`,'you');}
+    if(c.state!=='race')continue;
+    if(c.you)radioWarnings(c);else aiOrders(c);
+    if(c.pit)continue;
+    c.fireCd-=dt;
+    if(c.fireCd<=0&&(G.rate===0||c.ammo<=0))c.fireCd=0.25;
+    else if(c.fireCd<=0){
+      let tgt=null,tg=1e9;
+      for(const o of cars){if(o===c||o.state!=='race'||o.pit)continue;const g=o.d-c.d;if(g>1&&g<11&&Math.abs(o.lat-c.lat)<3.2&&g<tg){tg=g;tgt=o;}}
+      if(tgt){fire(c,tgt);c.fireCd=rand(1.8,3.4)/G.rate;}else c.fireCd=0.25;
+    }
+    if(c.mines>0)for(const o of cars){if(o===c||o.state!=='race'||o.pit)continue;const g=c.d-o.d;
+      if(g>2&&g<7&&Math.abs(o.lat-c.lat)<2&&Math.random()<0.1*dt){dropMine(c);break;}}
+  }
+  for(const m of mines){if(!m.active)continue;m.age+=dt;m.arm-=dt;
+    if(m.age>25){m.active=false;m.m.visible=false;continue;}
+    if(m.arm>0)continue;
+    for(const c of cars){if(c.state==='wreck'||c.pit)continue;
+      if(c.pos.distanceToSquared(m.m.position)<1.7*1.7){
+        m.active=false;m.m.visible=false;spark(m.m.position,true);
+        // Golden handling tune shrugs off the first spin of the race.
+        if(golden(c,'handling')&&!c.spinSaved){c.spinSaved=true;if(c.you)say(`${c.name}: caught it! Car's planted.`,'you');}
+        else{c.spin=0.7*statMul(c.drv.stats.composure,-0.01);c.v*=0.35;}
+        if(c.you)say(`${c.name}: hit a mine! ${m.owner.name} left it.`,'bad');
+        damage(c,rand(10,14),m.owner,'mine');break;}}
+  }
+  if(!race.over&&cars.every(c=>c.state!=='race')){race.over=true;race.overAt=race.t;}
+}
+
+// ================= visuals per frame =================
+function updateVisuals(dt,now){
+  for(const c of cars){
+    const s=mod(c.d,L),f=s/DS,i0=Math.floor(f)%N,i1=(i0+1)%N,u=f-Math.floor(f);
+    const px=P[i0].x+(P[i1].x-P[i0].x)*u,pz=P[i0].z+(P[i1].z-P[i0].z)*u;
+    c.pos.set(px+NRM[i0].x*c.lat,0,pz+NRM[i0].z*c.lat);
+    c.root.position.copy(c.pos);
+    const yaw=Math.atan2(-T[i0].z,T[i0].x)+c.spinA,step=Math.PI*2/HEADINGS;
+    c.yawG.rotation.y=Math.round(yaw/step)*step;
+    c.flash=Math.max(0,c.flash-dt*8);c.body.uniforms.uFlash.value=c.flash;c.trim.uniforms.uFlash.value=c.flash;
+    const smoking=c.state==='wreck'||c.dur<35;
+    if(smoking&&Math.random()<dt*(c.state==='wreck'?14:8)){
+      const p=pick(smoke,p=>p.life<=0);p.life=p.max=rand(1,1.6);p.m.visible=true;
+      p.m.position.set(c.pos.x+rand(-0.6,0.6),1.4,c.pos.z+rand(-0.6,0.6));p.vx=rand(-0.3,0.3);p.vz=rand(-0.3,0.3);}
+  }
+  for(const p of smoke){if(p.life<=0)continue;p.life-=dt;
+    if(p.life<=0){p.m.visible=false;continue;}
+    const k=p.life/p.max;p.m.position.y+=dt*1.8;p.m.position.x+=p.vx*dt;p.m.position.z+=p.vz*dt;p.m.scale.setScalar(0.2+0.8*k);}
+  for(const s of sparks){if(s.life<=0)continue;s.life-=dt;if(s.life<=0)s.m.visible=false;}
+  for(const t of tracers){if(t.life<=0)continue;t.life-=dt;if(t.life<=0)t.l.visible=false;}
+  for(const m of mines)if(m.active)m.m.visible=Math.floor(now*6)%2===0||m.arm>0;
+  for(const g of glints){g.position.x+=g.userData.v*dt;if(g.position.x>140)g.position.x=-140;}
+  for(const d of traffic){const ud=d.userData;ud.u=mod(ud.u+ud.v*dt,1);
+    d.position.copy(FW_A).addScaledVector(fwDir,ud.u*fwLen).addScaledVector(fwPerp,ud.lane).setY(FW_Y+0.55);}
+  // Screen-door any overpass span or tower that stands between the camera and a car.
+  for(const o of occluders){
+    let hide=false;
+    for(const c of cars){const R=c.pos.dot(RIGHT),U=c.pos.dot(UP)+0.8,D=c.pos.dot(DIR);
+      if(o.maxD<=D+1)continue;
+      if(o.seg){const[a,b,c2,d]=o.seg,ex=c2-a,ey=d-b,t=Math.max(0,Math.min(1,((R-a)*ex+(U-b)*ey)/(ex*ex+ey*ey)));
+        if(Math.hypot(R-a-ex*t,U-b-ey*t)<3.2){hide=true;break;}}
+      else if(R>o.minR-1&&R<o.maxR+1&&U>o.minU-1&&U<o.maxU+1){hide=true;break;}}
+    for(const m of o.mats)m.uniforms.uOpacity.value=hide?0.5:1;
+  }
+}
+
+// ================= views =================
+const ui={view:'full',pip:true,speed:1,paused:false};
+let W=480,H=270,PX=2;
+const VIEW_LABEL={full:'DRONE: FULL TRACK',c1:`CAM 1: ${cars[0].name}`,c2:`CAM 2: ${cars[1].name}`};
+const follow={};
+function layout(){
+  const views=[{key:ui.view,x:0,y:0,w:W,h:H,main:true}];
+  if(ui.pip){
+    const pw=Math.round(W*0.28),ph=Math.round(pw*0.62);
+    ['full','c1','c2'].filter(k=>k!==ui.view).forEach((k,n)=>views.push({key:k,x:4,y:4+n*(ph+5),w:pw,h:ph,main:false}));
+  }
+  return views;
+}
+function setupView(v,dt){
+  if(v.key==='full'){
+    const pip=ui.pip&&v.main;
+    const safe=pip?[Math.round(W*0.28)+10,4,v.w-4,v.h-4]:[4,4,v.w-4,v.h-4];
+    const s=Math.max((FIT.maxR-FIT.minR)/(safe[2]-safe[0]),(FIT.maxU-FIT.minU)/(safe[3]-safe[1]))*1.04;
+    const cx=(safe[0]+safe[2])/2,cy=(safe[1]+safe[3])/2;
+    return setCam((FIT.minR+FIT.maxR)/2-(cx-v.w/2)*s,(FIT.minU+FIT.maxU)/2+(cy-v.h/2)*s,s*v.h/2,v.w,v.h);
+  }
+  const c=v.key==='c1'?cars[0]:cars[1],id=v.key+(v.main?'m':'p');
+  const R=c.pos.dot(RIGHT),U=c.pos.dot(UP)+1;
+  const f=follow[id]||(follow[id]={R,U});
+  const k=1-Math.exp(-8*dt);f.R+=(R-f.R)*k;f.U+=(U-f.U)*k;
+  return setCam(f.R,f.U,v.main?15:10,v.w,v.h);
+}
+function durCol(d){return d>60?'#5cff8a':d>30?'#ffb03a':'#ff3b3b';}
+const proj=new THREE.Vector3();
+function drawLabels(v,order,now){
+  og.save();og.beginPath();og.rect(v.x,v.y,v.w,v.h);og.clip();
+  const lift=v.key==='full'?11:(v.main?30:20),taken=[];
+  // Your cars claim label space first; a rival's tag is skipped if it would overlap one already drawn.
+  const byPriority=order.filter(c=>c.you).concat(order.filter(c=>!c.you));
+  for(const c of byPriority){
+    proj.copy(c.pos).setY(0.85*CAR_SCALE).project(cam);
+    const sx=Math.round(v.x+(proj.x+1)/2*v.w),sy=Math.round(v.y+(1-proj.y)/2*v.h)-lift;
+    const label=c.state==='wreck'?'X':String(order.indexOf(c)+1),tw=textW(label),w=tw+4,x=sx-(w>>1);
+    const box=[x-1,sy-1,x+w+1,sy+(c.you?14:10)];
+    if(!c.you&&taken.some(b=>box[0]<b[2]&&box[2]>b[0]&&box[1]<b[3]&&box[3]>b[1])){
+      // No room: mark the car with a single team-colour pixel instead.
+      og.fillStyle=c.team.body;og.fillRect(sx,sy+lift-4,1,1);continue;
+    }
+    taken.push(box);
+    if(c.you){og.fillStyle='#c8fdff';og.fillRect(x-1,sy-1,w+2,11);}
+    og.fillStyle=c.flash>0.3?'#ffffff':c.state==='wreck'?'#3a2a36':c.team.body;og.fillRect(x,sy,w,7);
+    drawText(og,label,x+2,sy+1,'#0b0716');
+    og.fillStyle='#1a1230';og.fillRect(x,sy+7,w,2);og.fillStyle=durCol(c.dur);og.fillRect(x,sy+7,Math.max(0,Math.round(w*c.dur/100)),2);
+    if(c.you&&Math.floor(now*3)%2===0){og.fillStyle='#c8fdff';og.fillRect(sx-2,sy+11,5,1);og.fillRect(sx-1,sy+12,3,1);og.fillRect(sx,sy+13,1,1);}
+  }
+  og.restore();
+  const t=VIEW_LABEL[v.key];
+  if(v.main){const x=v.w-textW(t)-6;og.fillStyle='rgba(7,4,15,.7)';og.fillRect(x-3,v.h-12,textW(t)+6,9);drawText(og,t,x,v.h-10,'#9d8cc9');}
+  else{
+    og.fillStyle='#2ef2ff';og.fillRect(v.x-1,v.y-1,v.w+2,1);og.fillRect(v.x-1,v.y+v.h,v.w+2,1);og.fillRect(v.x-1,v.y,1,v.h);og.fillRect(v.x+v.w,v.y,1,v.h);
+    og.fillStyle='rgba(7,4,15,.8)';og.fillRect(v.x,v.y,textW(t)+5,8);drawText(og,t,v.x+2,v.y+1,'#2ef2ff');
+  }
+}
+function drawHud(now){
+  const lead=leader(),lap=Math.min(LAPS,Math.max(1,Math.floor(Math.max(0,lead.d)/L)+1));
+  const t=race.over?'FINISH':`LAP ${lap}/${LAPS}`;
+  og.fillStyle='rgba(7,4,15,.7)';og.fillRect(W-textW(t,2)-10,4,textW(t,2)+6,14);drawText(og,t,W-textW(t,2)-7,6,'#ffd23f',2);
+  if(race.ready&&race.t<0.8){
+    const n=race.t<0?String(Math.ceil(-race.t)):'GO!',sc=Math.max(3,Math.round(H/40)),w=textW(n,sc);
+    drawText(og,n,Math.round((W-w)/2)+sc,Math.round(H/2-2.5*sc)+sc,'#3a0d2a',sc);
+    drawText(og,n,Math.round((W-w)/2),Math.round(H/2-2.5*sc),race.t<0?'#ff2e88':'#5cff8a',sc);
+  }
+  if(ui.paused){const p='PAUSED',sc=2;drawText(og,p,Math.round((W-textW(p,sc))/2),8,'#f4ecff',sc);}
+}
+function render(dt,now){
+  const order=standings();
+  og.clearRect(0,0,W,H);
+  for(const v of layout()){
+    const s=setupView(v,dt),p=s/CAR_SCALE;
+    for(const c of cars)for(const o of c.outlines)o.h.scale.set(1+2*p/o.dx,1+2*p/o.dy,1+2*p/o.dz);
+    const gy=H-(v.y+v.h);
+    renderer.setViewport(v.x,gy,v.w,v.h);renderer.setScissor(v.x,gy,v.w,v.h);
+    renderer.setClearColor(0x07040f,1);renderer.render(scene,cam);
+    drawLabels(v,order,now);
+  }
+  drawHud(now);
+}
+
+// ================= HTML panels =================
+function buildDriverCards(){
+  mine.forEach((c,k)=>{
+    $('drv'+k).innerHTML=`
+      <div class="drv-head"><span class="tag">CAR ${k+1}</span><b>${c.name}</b><span class="pos" id="d${k}pos">P-</span>
+        <span class="hd"><span>LAP</span> <span id="d${k}lap">-</span></span><span class="hd" id="d${k}spd">-</span>
+        <button class="watch" data-watch="${k}">WATCH</button></div>
+      <div class="stats">${STATS.map(([id,ab])=>`<span title="${id}">${ab} <b>${c.drv.stats[id]}</b></span>`).join('')}</div>
+      <div class="abil">${c.drv.abilities.map(id=>{const a=ABILITIES[id];
+        return `<span class="ab${a.needs?' off':''}" id="d${k}ab-${id}" title="${a.desc}${a.needs?` (not active yet: needs ${a.needs})`:''}">${a.label}</span>`;}).join('')||'<span class="ab off">NO ABILITIES</span>'}</div>
+      <div class="drv-body">
+        <div class="meters">
+          <div class="m"><span>ARMOR</span><div class="meter"><i id="d${k}armB"></i></div><span id="d${k}arm">100%</span></div>
+          <div class="m"><span>TIRES <b id="d${k}cmp"></b></span><div class="meter"><i id="d${k}tireB"></i></div><span id="d${k}tire">100%</span></div>
+          <div class="m"><span>FUEL</span><div class="meter"><i id="d${k}fuelB"></i><b id="d${k}fuelF" class="flag"></b></div><span id="d${k}fuel">100%</span></div>
+          <div class="m"><span>ROUNDS</span><div class="meter"><i id="d${k}ammoB"></i></div><span id="d${k}ammo">${AMMO}</span></div>
+        </div>
+        <div class="orders">${Object.entries(ORDERS).map(([kind,o])=>
+          `<div class="ord" role="group" aria-label="${c.name} ${o.label.toLowerCase()} order"><span>${o.label}</span>${Object.entries(o.opts).map(([id,v])=>
+            `<button data-car="${k}" data-kind="${kind}" data-val="${id}" aria-pressed="${id==='std'}">${v.label}</button>`).join('')}</div>`).join('')}
+          <div class="ord" role="group" aria-label="${c.name} pit stop"><span>PIT</span>
+            <button data-car="${k}" data-pit="pitFuel" aria-pressed="true" title="Refuel enough to finish on RICH">FUEL</button>
+            <button data-car="${k}" data-pitcmp id="d${k}pitcmp" aria-pressed="true" title="Compound to fit at the stop (click to change)">MED</button>
+            <button data-car="${k}" data-box id="d${k}box" aria-pressed="false" class="box">BOX</button></div>
+        </div>
+      </div>
+      <div class="tunerow" id="d${k}tune"></div>
+      <div class="parts" id="d${k}parts"></div>
+      <div class="status" id="d${k}st">Ready on the grid</div>`;
+  });
+  document.querySelectorAll('[data-kind]').forEach(b=>b.addEventListener('click',()=>{
+    const c=mine[+b.dataset.car],kind=b.dataset.kind;c.orders[kind]=b.dataset.val;
+    b.parentElement.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
+    say(`Radio to ${c.name}: ${ORDERS[kind].label.toLowerCase()} ${ORDERS[kind].opts[b.dataset.val].label}.`,'you');
+  }));
+  const PIT_CYCLE=['medium','soft','hard','none'];
+  document.querySelectorAll('[data-pitcmp]').forEach(b=>b.addEventListener('click',()=>{
+    const c=mine[+b.dataset.car];c.pitCompound=PIT_CYCLE[(PIT_CYCLE.indexOf(c.pitCompound)+1)%PIT_CYCLE.length];
+    syncPitButton(+b.dataset.car);
+  }));
+  document.querySelectorAll('[data-pit]').forEach(b=>b.addEventListener('click',()=>{
+    const c=mine[+b.dataset.car];c[b.dataset.pit]=!c[b.dataset.pit];b.setAttribute('aria-pressed',String(c[b.dataset.pit]));
+  }));
+  document.querySelectorAll('[data-box]').forEach(b=>b.addEventListener('click',()=>{
+    const c=mine[+b.dataset.car];if(c.pit||c.state!=='race')return;
+    c.boxReq=!c.boxReq;b.setAttribute('aria-pressed',String(c.boxReq));
+    say(c.boxReq?`Radio to ${c.name}: box this lap.`:`Radio to ${c.name}: stay out, cancel the stop.`,'you');
+  }));
+  document.querySelectorAll('[data-watch]').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.watch==='0'?'c1':'c2')));
+}
+function syncPitButton(k){
+  const c=mine[k],b=$(`d${k}pitcmp`);if(!b)return;
+  b.textContent=c.pitCompound==='none'?'NO TIRES':c.pitCompound==='medium'?'MED':COMPOUNDS[c.pitCompound].label;
+  b.setAttribute('aria-pressed',String(c.pitCompound!=='none'));
+}
+function gapText(c,lead,k){
+  if(c.state==='wreck')return'DNF';
+  if(c.pit)return'PIT';
+  if(k===0)return c.state==='done'?'WINNER':'LEADER';
+  if(c.state==='done'&&lead.state==='done')return'+'+(c.finishT-lead.finishT).toFixed(1);
+  const diff=lead.d-c.d;return diff>L?`+${Math.floor(diff/L)} LAP`:`+${(diff/27).toFixed(1)}`;
+}
+function updatePanels(){
+  const order=standings(),lead=order[0];
+  $('tower').innerHTML=order.map((c,k)=>`<li class="row${c.you?' you':''}"><span class="p">${k+1}</span>
+    <i class="chip" style="background:${c.team.body}"></i><span class="n">${c.name} <small style="color:${COMPOUNDS[c.compound].col}">${COMPOUNDS[c.compound].short}</small> <small>${c.team.id}</small></span>
+    <span class="g">${gapText(c,lead,k)}</span><span class="meter"><i style="width:${c.dur}%;background:${durCol(c.dur)}"></i></span></li>`).join('');
+  mine.forEach((c,k)=>{
+    const p=order.indexOf(c)+1;
+    $(`d${k}pos`).textContent=c.state==='wreck'?'DNF':`P${p}`;
+    $(`d${k}lap`).textContent=c.state==='done'?'FINISHED':`${Math.min(LAPS,Math.max(1,Math.floor(Math.max(0,c.d)/L)+1))}/${LAPS}`;
+    $(`d${k}spd`).textContent=`${Math.round(c.v*7.2)} km/h`;
+    const meter=(id,val,max,col)=>{$(`d${k}${id}B`).style.width=val/max*100+'%';$(`d${k}${id}B`).style.background=col;};
+    meter('arm',c.dur,100,durCol(c.dur));$(`d${k}arm`).textContent=Math.round(c.dur)+'%';
+    meter('tire',c.tire,100,durCol(c.tire));
+    const cm=COMPOUNDS[c.compound];$(`d${k}cmp`).textContent=cm.short;$(`d${k}cmp`).style.color=cm.col;syncPitButton(k);$(`d${k}tire`).textContent=Math.round(c.tire)+'%';
+    const flag=fuelAtFlag(c);
+    meter('fuel',c.fuel,100,durCol(c.fuel));
+    $(`d${k}fuel`).textContent=Math.round(c.fuel)+'%';
+    // Marker on the fuel bar: where the level will be at the flag on the current order.
+    const fl=$(`d${k}fuelF`);fl.hidden=c.state!=='race';fl.style.left=Math.max(0,Math.min(100,flag))+'%';fl.classList.toggle('short',flag<0);
+    meter('ammo',c.ammo,AMMO,c.ammo<=0?'#ff3b3b':'#2ef2ff');$(`d${k}ammo`).textContent=c.ammo;
+    $(`d${k}box`).setAttribute('aria-pressed',String(c.boxReq||!!c.pit));
+    $(`d${k}st`).textContent=c.state==='wreck'?'Wrecked. Recovery truck dispatched.':c.state==='done'?'Cooling down.':
+      c.pit?(c.pit.phase==='stop'?`In the box: ${Math.max(0,c.pit.t).toFixed(1)}s`:'Pit lane, limiter on'):
+      c.boxReq?'Boxing this lap':
+      c.spin>0?'Spinning!':c.fuel<=0?'Out of fuel. Crawling.':c.dur<35?'Smoking. Plating is gone.':race.t<0?'Ready on the grid':
+      `Fuel at flag ${flag<0?'SHORT '+Math.round(-flag)+'%':'+'+Math.round(flag)+'%'} · ${c.mines} mine${c.mines===1?'':'s'} left`;
+    $(`d${k}tune`).innerHTML=c.tune&&c.tune.locked?'TUNE '+GAUGES.map(g=>{const gr=c.tune.grades[g.id];
+      return `<span>${g.short} <b class="g-${gr}">${gr}${gr==='S'?'★':''}</b></span>`;}).join(''):'TUNE <span>not locked</span>';
+    c.drv.abilities.forEach(id=>{const el=$(`d${k}ab-${id}`);if(el)el.classList.toggle('on',!!c.abOn[id]||(id==='nightowl'&&!tuneDone)||(!ABILITIES[id].needs&&race.t>0&&
+      ((id==='boulevard'&&TRACK.tags.includes('straights'))||(id==='streetrat'&&TRACK.tags.includes('tight')))));});
+    $(`d${k}parts`).innerHTML=PARTS.map(pt=>{const v=c.cond[pt.id];
+      return `<span>${pt.short}</span><div class="meter" title="${pt.label} ${Math.round(v)}%"><i style="width:${v}%;background:${durCol(v)}"></i></div>`;}).join('');
+    if(race.t>0&&c.state==='race'&&p<c.lastPos&&p<=3)say(`${c.name} up to P${p}.`,'you');
+    c.lastPos=p;
+  });
+  if(race.over&&!race.resultShown&&race.t-race.overAt>1.5){
+    race.resultShown=true;
+    settleRace(order);
+    $('restart').disabled=true;[4,6,10,15].forEach(n=>$('l'+n).disabled=true);
+    renderGarage();$('result').hidden=false;
+  }
+}
+
+// ================= between races: money, new parts arriving, AI garages, regulations =================
+let lastSettle=null;
+function settleRace(order){
+  const pay={};TEAMS.forEach(t=>pay[t.name]=BASE_PAY);
+  order.forEach((c,k)=>{if(c.state==='done'&&k<RACE_PAY.length)pay[c.team.name]+=RACE_PAY[k];});
+  TEAMS.forEach(t=>t.cash+=pay[t.name]);
+  lastSettle={order,pay:pay[TEAMS[0].name],mine:mine.map(c=>({name:c.name,pos:order.indexOf(c)+1,dnf:c.state==='wreck',
+    prize:c.state==='done'&&order.indexOf(c)<RACE_PAY.length?RACE_PAY[order.indexOf(c)]:0}))};
+  // Parts in development get one race closer; finished ones arrive fresh on both cars.
+  TEAMS.forEach(t=>PARTS.forEach(({id,label})=>{
+    const pt=t.parts[id];if(pt.dev<=0)return;
+    if(--pt.dev===0){pt.level+=DEV_STEP;cars.filter(c=>c.team===t).forEach(c=>c.cond[id]=100);
+      if(t.you)say(`Garage: new ${label.toLowerCase()} is ready (level ${pt.level}).`,'you');}
+  }));
+  TEAMS.filter(t=>!t.you).forEach(aiGarage);
+  updateHeader();
+  if(league.race===2&&!league.review){
+    const ids=PARTS.map(p=>p.id).sort(()=>Math.random()-0.5);league.review=ids.slice(0,2);
+    say(`Rules committee names ${league.review.map(x=>x.toUpperCase()).join(' and ')} for review. One gets new regs next season.`,'bad');
+  }
+}
+function developPart(t,id){const pt=t.parts[id];t.cash-=newPartCost(pt.level);pt.dev=DEV_RACES;}
+function rebuildPart(t,c,id){t.cash-=rebuildCost(t.parts[id].level);c.cond[id]=100;}
+// AI garage calls by business rating: rookies rebuild late and waste money, elites plan around new parts
+// and steer clear of over-developing a part that's under regulation review.
+function aiGarage(t){
+  const b=t.mgr.business,teamCars=cars.filter(c=>c.team===t),reserve=b==='rookie'?0:0.3;
+  const avg=PARTS.reduce((a,p)=>a+t.parts[p.id].level,0)/PARTS.length;
+  for(const {id} of PARTS){
+    const pt=t.parts[id],rb=rebuildCost(pt.level),worst=Math.min(...teamCars.map(c=>c.cond[id]));
+    if(b==='rookie'){
+      if(pt.dev<=0&&t.cash>newPartCost(pt.level)&&Math.random()<0.3)developPart(t,id);
+      teamCars.forEach(c=>{if(c.cond[id]<REBUILD_AT.rookie&&t.cash>rb)rebuildPart(t,c,id);});
+      continue;
+    }
+    if(pt.dev<=0){
+      // Pros replace a clearly lagging part; elites also replace worn ones (a new part arrives fresh)
+      // but won't pour money into a part under regulation review that's already above the line.
+      const risky=b==='elite'&&league.review&&league.review.includes(id)&&pt.level>=fieldMedian(id)+REG_MARGIN;
+      const wants=b==='elite'?(pt.level<avg-2||worst<REBUILD_AT.elite):pt.level<avg-3;
+      if(!risky&&wants&&t.cash-reserve-2*rb>newPartCost(pt.level)){developPart(t,id);continue;}
+    }
+    const arriving=pt.dev>0&&pt.dev<=(b==='elite'?3:1);
+    teamCars.forEach(c=>{if(c.cond[id]<REBUILD_AT[b]&&!arriving&&t.cash-reserve>rb)rebuildPart(t,c,id);});
+  }
+}
+function renderGarage(){
+  const me=TEAMS[0],s=lastSettle,rowsTop=s.order.slice(0,6);
+  const extra=mine.filter(c=>s.order.indexOf(c)>=6);
+  const resItem=c=>`<li class="${c.you?'you':''}" value="${s.order.indexOf(c)+1}">${c.name} <small>${c.team.id}</small>${c.state==='wreck'?' · DNF':''}</li>`;
+  const reg=league.review?`<p class="regwatch">Rules committee reviewing <b>${league.review.map(x=>x.toUpperCase()).join('</b> and <b>')}</b>. One gets new regs at season end: levels above the field median +${REG_MARGIN} keep only ${Math.round(REG_KEEP*100)}% of the excess.</p>`:'';
+  const lastReg=league.lastReg&&league.race===1?`<p class="regwatch hit">${league.lastReg}</p>`:'';
+  const rows=PARTS.map(({id,label})=>{
+    const pt=me.parts[id],med=fieldMedian(id),diff=pt.level-med,rb=rebuildCost(pt.level),np=newPartCost(pt.level);
+    const risky=league.review&&league.review.includes(id)&&pt.level>med+REG_MARGIN;
+    const condCell=c=>`<td>${Math.round(c.cond[id])}%</td>`;
+    const rbBtn=(c,k)=>`<td><button data-rebuild="${id}" data-car="${k}" ${c.cond[id]>=99.5||me.cash<rb?'disabled':''}>REBUILD ${c.name} ${rb.toFixed(2)}</button></td>`;
+    const newBtn=pt.dev>0?`<td>NEW IN ${pt.dev} RACE${pt.dev>1?'S':''}</td>`:
+      `<td><button data-newpart="${id}" ${me.cash<np?'disabled':''}>NEW +${DEV_STEP} ${np.toFixed(2)}</button></td>`;
+    return `<tr><td>${label}</td><td class="${risky?'over':''}">${pt.level} (${diff>=0?'+':''}${diff.toFixed(0)})</td>${mine.map(condCell).join('')}${mine.map(rbBtn).join('')}${newBtn}</tr>`;
+  }).join('');
+  const done=league.race>=RACES_PER_SEASON;
+  $('garage').innerHTML=`
+    <h3>SEASON ${league.season} · RACE ${league.race}/${RACES_PER_SEASON} · CHECKERED FLAG</h3>
+    ${lastReg}
+    <div class="gcols">
+      <section><h4>RESULT</h4><ol class="gres">${rowsTop.map(resItem).join('')}${extra.map(resItem).join('')}</ol>
+        <p class="gmoney">${s.mine.map(m=>`${m.name} ${m.dnf?'DNF':'P'+m.pos} +${m.prize.toFixed(2)}`).join('<br>')}<br>Base pay +${BASE_PAY.toFixed(2)}<br>Race total <b>+${s.pay.toFixed(2)}</b><br>Bank <b>${fmtQT(me.cash)}</b></p></section>
+      <section><h4>GARAGE · LEVEL (VS FIELD MEDIAN) · CONDITION</h4>${reg}
+        <table class="ptab"><thead><tr><th>PART</th><th>LEVEL</th>${mine.map(c=>`<th>${c.name}</th>`).join('')}<th colspan="2">REBUILD (M QT)</th><th>DEVELOP NEW</th></tr></thead>
+        <tbody>${rows}</tbody></table></section>
+    </div>
+    <div class="gfoot"><span>Rebuild: fresh condition, same level. New part: +${DEV_STEP} levels and fresh, ready in ${DEV_RACES} races.</span>
+      <button id="nextRace">${done?'END SEASON':'NEXT RACE'}</button></div>`;
+  $('garage').querySelectorAll('[data-rebuild]').forEach(b=>b.addEventListener('click',()=>{
+    rebuildPart(me,mine[+b.dataset.car],b.dataset.rebuild);renderGarage();updateHeader();}));
+  $('garage').querySelectorAll('[data-newpart]').forEach(b=>b.addEventListener('click',()=>{
+    developPart(me,b.dataset.newpart);renderGarage();updateHeader();}));
+  $('nextRace').addEventListener('click',nextRace);
+}
+function nextRace(){
+  league.lastReg=null;
+  if(++league.race>RACES_PER_SEASON){
+    if(league.review){
+      const id=choice(league.review),label=PARTS.find(p=>p.id===id).label,cap=fieldMedian(id)+REG_MARGIN;
+      let myLoss=0;
+      TEAMS.forEach(t=>{const pt=t.parts[id];if(pt.level>cap){const nl=Math.round(cap+(pt.level-cap)*REG_KEEP);if(t.you)myLoss=pt.level-nl;pt.level=nl;}});
+      league.lastReg=`New regs: ${REG_NAMES[id]} (${label}). Levels above ${cap.toFixed(0)} muted${myLoss?`: your ${label.toLowerCase()} lost ${myLoss} levels`:': your team was under the line'}.`;
+    }
+    league.season++;league.race=1;league.review=null;
+  }
+  cars.forEach(c=>c.condStart={...c.cond});
+  resetRace();startNightTune();
+  if(league.lastReg)say(league.lastReg,'bad');
+}
+
+// ================= NIGHT TUNE =================
+// Five gauges start at 0, each with a hidden target set by the track (plus a small per-driver offset).
+// Initial tune (blind) -> flying lap -> tune -> flying lap -> final tune. Every pick is a fresh offer of
+// cards with exact effects; randomness lives in which cards are offered and in the driver's feedback,
+// never in what a chosen card does. Grades S..D decide how much of the car the driver gets on race night.
+const GAUGES=[
+  {id:'engine',label:'ENGINE',short:'ENG',word:'Engine',gold:'+1.5% top speed'},
+  {id:'handling',label:'HANDLING',short:'HND',word:'Handling',gold:'Shrugs off the first spin'},
+  {id:'aero',label:'AERO',short:'AER',word:'Aero',gold:'+2% pace in a slipstream'},
+  {id:'weapons',label:'WEAPONS',short:'WPN',word:'Guns',gold:'+10% hit chance, no jams'},
+  {id:'armor',label:'ARMOR',short:'ARM',word:'Plating',gold:'First hit each lap does half damage'},
+];
+const TUNE_PHASES=[{picks:4,label:'TEAM BASELINE',note:'Blind, and shared: these picks set up both cars.'},
+  {picks:3,label:'TUNE 2',note:'Use the flying-lap feedback.'},{picks:3,label:'FINAL TUNE',note:'No lap after this one: commit.'}];
+const T_MIN=25,T_MAX=90,GRADES=[['S',5],['A',10],['B',18],['C',28],['D',999]];
+const GRADE_SHARE={S:1,A:0.95,B:0.88,C:0.80,D:0.70};
+const AI_GRADE_ODDS={rookie:[.12,.15,.25,.25,.23],pro:[.25,.22,.25,.17,.11],elite:[.40,.27,.20,.10,.03]};
+const CHIEF={name:'RIZZO',skill:3};   // your crew chief (1-5 stars) until staff hiring exists
+const CARD_NAMES={
+  engine:['Remap the injectors','Overclock the turbo','Detune the ECU'],handling:['Stiffen the springs','Tighten the diff','Soften the dampers'],
+  aero:['Add wing','Bolt on a splitter','Trim the wing'],weapons:['Rechamber the rounds','Hot-wire the feed','Tighten the choke'],
+  armor:['Bolt on plating','Shift plates rearward','Strip some plating']};
+let tuneDone=false,ntCar=0;
+const gradeOf=d=>GRADES.find(([,lim])=>d<=lim)[0];
+const tuneShare=(c,g)=>c.tune&&c.tune.grades?GRADE_SHARE[c.tune.grades[g]]:0.88;
+const tunePace=(c,g)=>1-(1-tuneShare(c,g))*0.12;          // a D tune costs ~3.6% on that axis
+const golden=(c,g)=>!!(c.tune&&c.tune.grades&&c.tune.grades[g]==='S');
+const sigmaOf=c=>15*Math.max(0.4,1-(c.drv.stats.feedback-70)*0.02)*(has(c,'nightowl')?0.7:1);
+const PRIOR_MU=(T_MIN+T_MAX)/2,PRIOR_VAR=(T_MAX-T_MIN)**2/12;
+function estimate(c,g){   // player-side belief about a target: uniform prior + noisy readings
+  const rs=c.tune.readings[g],sg=sigmaOf(c),prec=1/PRIOR_VAR+rs.length/sg**2;
+  const mu=(PRIOR_MU/PRIOR_VAR+rs.reduce((a,b)=>a+b,0)/sg**2)/prec;
+  return {mu:Math.min(T_MAX,Math.max(T_MIN,mu)),sd:Math.sqrt(1/prec)};
+}
+function makeCard(c){
+  const s=CHIEF.skill-1;
+  if(Math.random()<0.03*s)return {trim:true};
+  let g,sign;
+  if(Math.random()<0.1+0.15*s){   // a good chief offers what the car seems to need
+    const needs=GAUGES.map(x=>estimate(c,x.id).mu-c.tune.vals[x.id]);
+    const k=needs.reduce((b,v,i)=>Math.abs(v)>Math.abs(needs[b])?i:b,0);g=GAUGES[k].id;sign=needs[k]>=0?1:-1;
+  }else{g=choice(GAUGES).id;sign=Math.random()<0.2?-1:1;}
+  let mag=15+Math.floor(Math.random()*(21+s));if(sign<0)mag=Math.max(4,Math.floor(mag/2));
+  const fx=[[g,sign*mag]];
+  if(Math.random()<0.8-0.12*s){const o=choice(GAUGES.filter(x=>x.id!==g)).id;fx.push([o,-(3+Math.floor(Math.random()*6))]);}
+  const names=CARD_NAMES[g];return {fx,name:sign>0?names[Math.floor(Math.random()*2)]:names[2]};
+}
+function dealOffer(c){const n=3+(Math.random()<0.15*(CHIEF.skill-1)?1:0);c.tune.offer=Array.from({length:n},()=>makeCard(c));c.tune.trimOpen=false;}
+function startNightTune(){
+  tuneDone=false;race.ready=false;ntCar=0;
+  const trackTargets={};GAUGES.forEach(g=>trackTargets[g.id]=rand(T_MIN,T_MAX));
+  cars.forEach(c=>{
+    if(!c.you){   // AI cars: grades come from their manager's tactics rating
+      const odds=AI_GRADE_ODDS[c.team.mgr.tactics],grades={};
+      GAUGES.forEach(g=>{let r=Math.random(),k=0;while(k<4&&r>odds[k]){r-=odds[k];k++;}grades[g.id]='SABCD'[k];});
+      c.tune={locked:true,grades};return;
+    }
+    const tune={vals:{},targets:{},readings:{},grades:null,locked:false,phase:0,picks:TUNE_PHASES[0].picks,quotes:[],lapReady:false};
+    GAUGES.forEach(g=>{tune.vals[g.id]=0;tune.readings[g.id]=[];
+      tune.targets[g.id]=Math.min(T_MAX,Math.max(T_MIN,trackTargets[g.id]+rand(-8,8)));});
+    c.tune=tune;
+  });
+  // The initial blind tune is a team baseline: one shared offer, picks apply to both cars.
+  dealOffer(mine[0]);mine[1].tune.offer=mine[0].tune.offer;
+  $('tuneOv').hidden=false;renderTune();
+}
+function applyFx(c,fx){fx.forEach(([g,d])=>c.tune.vals[g]=Math.max(0,Math.min(100,c.tune.vals[g]+d)));}
+const shared=c=>c.tune.phase===0&&!c.tune.lapReady;
+function usePick(c){
+  if(shared(c)){
+    mine.forEach(x=>x.tune.picks--);
+    if(mine[0].tune.picks>0){dealOffer(mine[0]);mine[1].tune.offer=mine[0].tune.offer;}
+    else mine.forEach(x=>{x.tune.offer=[];x.tune.lapReady=true;});
+    return;
+  }
+  const t=c.tune;t.picks--;
+  if(t.picks>0)dealOffer(c);else{t.offer=[];t.lapReady=true;}
+}
+// Apply a card: during the shared baseline it changes both cars.
+function pickFx(c,fx){(shared(c)?mine:[c]).forEach(x=>applyFx(x,fx));usePick(c);}
+function flyingLap(c){
+  const t=c.tune,sg=sigmaOf(c);t.quotes=[];
+  GAUGES.forEach(g=>{
+    const r=t.targets[g.id]+gauss()*sg;t.readings[g.id].push(r);
+    const d=r-t.vals[g.id];
+    t.quotes.push(d>18?`${g.word} way off, needs a lot more.`:d>6?`${g.word} close, needs a touch more.`:
+      d>=-6?`${g.word} feels right.`:d>=-18?`${g.word} slightly overdone.`:`${g.word} way overcooked, back it off.`);
+  });
+  t.phase++;t.picks=TUNE_PHASES[t.phase].picks;t.lapReady=false;dealOffer(c);
+}
+function lockTune(c){
+  const t=c.tune;t.grades={};
+  GAUGES.forEach(g=>t.grades[g.id]=gradeOf(Math.abs(t.vals[g.id]-t.targets[g.id])));
+  t.locked=true;t.offer=[];
+  const golds=GAUGES.filter(g=>t.grades[g.id]==='S').length;
+  if(golds===GAUGES.length)say(`${c.name}: PERFECT TUNE. Every gauge golden.`,'you');
+}
+// Quick tune: plays the remaining picks the way a sensible crew would (greedy on the current estimate).
+function autoTune(c){
+  const t=c.tune,cost=()=>GAUGES.reduce((a,g)=>{const m=estimate(c,g.id).mu,v=t.vals[g.id];return a+(v<=m?m-v:1.5*(v-m));},0);
+  while(!t.locked){
+    if(t.lapReady){if(t.phase<TUNE_PHASES.length-1){flyingLap(c);continue;}lockTune(c);break;}
+    let best=null,bestCost=cost();
+    t.offer.forEach(card=>{
+      const opts=card.trim?GAUGES.flatMap(g=>[[[g.id,4]],[[g.id,-4]]]):[card.fx];
+      opts.forEach(fx=>{const save={...t.vals};applyFx(c,fx);const k=cost();t.vals=save;if(k<bestCost){bestCost=k;best=fx;}});
+    });
+    if(best)pickFx(c,best);else usePick(c);
+  }
+}
+function gauss(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+function renderTune(){
+  const c=mine[ntCar],t=c.tune,ph=TUNE_PHASES[Math.min(t.phase,TUNE_PHASES.length-1)];
+  const steps=TUNE_PHASES.map((p,i)=>{
+    const dots=Array.from({length:p.picks},(_,j)=>{const used=i<t.phase||t.locked||(i===t.phase&&j<p.picks-t.picks);
+      return `<i class="${used?'done':i===t.phase&&j===p.picks-t.picks?'now':''}"></i>`;}).join('');
+    return dots+(i<TUNE_PHASES.length-1?`<span class="${i<t.phase?'done':''}">LAP</span>`:'');}).join('');
+  const rows=GAUGES.map(g=>{
+    const v=t.vals[g.id],e=estimate(c,g.id),seen=t.readings[g.id].length>0;
+    const lo=seen?Math.max(0,e.mu-1.5*e.sd):T_MIN,hi=seen?Math.min(100,e.mu+1.5*e.sd):T_MAX;
+    const win=t.locked?`<span class="win" style="left:${Math.max(0,t.targets[g.id]-5)}%;width:10%"></span>`:'';
+    const gr=t.locked?`<span class="grade g-${t.grades[g.id]}">${t.grades[g.id]}${t.grades[g.id]==='S'?'★':''}</span>`:'<span></span>';
+    return `<span class="gl" title="Golden: ${g.gold}">${g.label}</span><div class="gbar"><span class="band" style="left:${lo}%;width:${hi-lo}%"></span>${win}<span class="val" style="left:${v}%"></span></div><span>${Math.round(v)}</span>${gr}`;
+  }).join('');
+  const fxTxt=fx=>fx.map(([g,d])=>`<span class="${d>0?'up':'dn'}">${d>0?'+':''}${d} ${GAUGES.find(x=>x.id===g).short}</span>`).join(' ');
+  let offer='';
+  if(!t.locked&&t.offer.length){
+    offer=t.trimOpen?`<div class="trim">${GAUGES.map(g=>`<span>${g.short}</span><button data-trim="${g.id}" data-d="-4">-4</button><button data-trim="${g.id}" data-d="4">+4</button>`).join('')}</div>`:
+      `<div class="offer">${t.offer.map((cd,i)=>cd.trim?`<button class="tcard" data-card="${i}"><b>FINE TRIM</b>±4 on any gauge</button>`:
+        `<button class="tcard" data-card="${i}"><b>${cd.name.toUpperCase()}</b>${fxTxt(cd.fx)}</button>`).join('')}</div>`;
+  }
+  const allLocked=mine.every(x=>x.tune.locked);
+  const act=t.locked?(allLocked?`<button id="ntStart">START RACE</button>`:`<button id="ntNext">TUNE ${mine[1-ntCar].name}</button>`):
+    t.lapReady?(t.phase<TUNE_PHASES.length-1?`<button id="ntLap">RUN FLYING LAP</button>`:`<button id="ntLock">LOCK IN ${c.name}</button>`):
+    `<button id="ntPass">PASS</button>`;
+  const status=t.locked?`Locked. Golden gauges: ${GAUGES.filter(g=>t.grades[g.id]==='S').map(g=>`${g.label} (${g.gold})`).join(', ')||'none'}.`:
+    t.lapReady?(t.phase<TUNE_PHASES.length-1?'Picks used. Send the car out for feedback.':'Final picks used. Lock it in.'):
+    `${ph.label} · ${t.picks} pick${t.picks>1?'s':''} left · ${ph.note}`;
+  $('tune').innerHTML=`
+    <div class="nt-top"><div><h3>NIGHT TUNE · ${TRACK.name.toUpperCase()}</h3>
+      <p class="nt-sub">Chief ${CHIEF.name} ${'★'.repeat(CHIEF.skill)}${'☆'.repeat(5-CHIEF.skill)} · ${c.name} feedback ${c.drv.stats.feedback}${has(c,'nightowl')?' + NIGHT OWL':''}</p></div>
+      <div class="grp" role="group" aria-label="Car to tune">${mine.map((x,i)=>`<button data-ntcar="${i}" aria-pressed="${i===ntCar}">${x.name}${x.tune.locked?' ✓':''}</button>`).join('')}</div></div>
+    <div class="nt-steps">${steps}</div>
+    <p class="nt-sub">${status}</p>
+    <div class="gauges">${rows}</div>
+    <div class="cmprow"><span class="nt-sub">START ON</span>${CMP_ORDER.map(k=>`<button data-startcmp="${k}" aria-pressed="${c.compound===k}"
+      title="Grip ${Math.round((COMPOUNDS[k].grip-1)*100)}%">${COMPOUNDS[k].label} · ${tireLifeLaps(c,k).toFixed(1)} laps</button>`).join('')}
+      <span class="nt-sub">Race is ${LAPS} laps. Lap life on STD tire orders.</span></div>
+    <div class="quotes">${t.quotes.length?t.quotes.map(q=>`<p>${c.name}: "${q}"</p>`).join(''):`<p>${c.name}: "Send me out and I'll tell you what she needs."</p>`}</div>
+    ${offer}
+    <div class="nt-foot"><span class="nt-sub">Grade by distance to target: S ≤5 (golden), A ≤10, B ≤18, C ≤28, D beyond.</span>
+      <span class="btns">${t.locked?'':`<button id="ntAuto">QUICK TUNE</button>`}${act}</span></div>`;
+  const T=$('tune');
+  T.querySelectorAll('[data-ntcar]').forEach(b=>b.addEventListener('click',()=>{ntCar=+b.dataset.ntcar;renderTune();}));
+  T.querySelectorAll('[data-card]').forEach(b=>b.addEventListener('click',()=>{
+    const cd=t.offer[+b.dataset.card];if(cd.trim){t.trimOpen=true;renderTune();return;}
+    pickFx(c,cd.fx);renderTune();}));
+  T.querySelectorAll('[data-trim]').forEach(b=>b.addEventListener('click',()=>{pickFx(c,[[b.dataset.trim,+b.dataset.d]]);renderTune();}));
+  T.querySelectorAll('[data-startcmp]').forEach(b=>b.addEventListener('click',()=>{c.startCompound=c.compound=b.dataset.startcmp;renderTune();}));
+  const on=(id,fn)=>{const el=$(id);if(el)el.addEventListener('click',()=>{fn();renderTune();});};
+  on('ntPass',()=>usePick(c));
+  on('ntLap',()=>flyingLap(c));
+  on('ntLock',()=>lockTune(c));
+  on('ntAuto',()=>autoTune(c));
+  on('ntNext',()=>{ntCar=1-ntCar;});
+  const st=$('ntStart');if(st)st.addEventListener('click',()=>{tuneDone=true;race.ready=true;$('tuneOv').hidden=true;
+    say(`Tunes locked. ${mine.map(x=>`${x.name} ${GAUGES.map(g=>x.tune.grades[g.id]).join('')}`).join(' · ')}.`,'you');});
+}
+
+// ================= controls =================
+function setView(k){ui.view=k;['full','c1','c2'].forEach(x=>$('v-'+x).setAttribute('aria-pressed',String(x===k)));}
+function setLaps(n){LAPS=n;[4,6,10,15].forEach(x=>$('l'+x).setAttribute('aria-pressed',String(x===n)));$('lapsTxt').textContent=n+' laps';resetRace();}
+[4,6,10,15].forEach(n=>$('l'+n).addEventListener('click',()=>setLaps(n)));
+function setSpeed(n){ui.speed=n;[1,2,4].forEach(x=>$('s'+x).setAttribute('aria-pressed',String(x===n)));}
+function togglePip(){ui.pip=!ui.pip;$('pip').setAttribute('aria-pressed',String(ui.pip));}
+function togglePause(){ui.paused=!ui.paused;$('pause').setAttribute('aria-pressed',String(ui.paused));}
+['full','c1','c2'].forEach(k=>$('v-'+k).addEventListener('click',()=>setView(k)));
+[1,2,4].forEach(n=>$('s'+n).addEventListener('click',()=>setSpeed(n)));
+$('pip').addEventListener('click',togglePip);$('pause').addEventListener('click',togglePause);
+$('restart').addEventListener('click',resetRace);
+addEventListener('keydown',e=>{
+  if(e.target.closest&&e.target.closest('button')&&e.key===' ')return;
+  if(e.key==='1')setView('full');else if(e.key==='2')setView('c1');else if(e.key==='3')setView('c2');
+  else if(e.key==='p'||e.key==='P')togglePip();else if(e.key===' '){e.preventDefault();togglePause();}
+});
+ov.addEventListener('click',e=>{
+  const r=ov.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*W,y=(e.clientY-r.top)/r.height*H;
+  const hit=layout().find(v=>!v.main&&x>=v.x&&x<v.x+v.w&&y>=v.y&&y<v.y+v.h);if(hit)setView(hit.key);
+});
+
+// The stage's frame (outline + drop shadow) needs 3px on the top/left and 7px on the bottom/right.
+const FRAME_TL=3,FRAME_BR=7;
+function resize(){
+  const box=$('box'),fill=getComputedStyle($('wrap')).getPropertyValue('--fill').trim()==='1';
+  const bw=box.clientWidth-FRAME_TL-FRAME_BR;
+  let bh;
+  if(fill){box.style.height='';bh=box.clientHeight-FRAME_TL-FRAME_BR;}else bh=Math.round(bw*9/16);
+  // Keep the internal render near 560x360 or smaller so pixels stay chunky at any window size.
+  PX=Math.max(1,Math.ceil(Math.max(bw/560,bh/360)));
+  const nW=Math.max(160,Math.floor(bw/PX)),nH=Math.max(90,Math.floor(bh/PX));
+  if(!fill)box.style.height=nH*PX+FRAME_TL+FRAME_BR+'px';
+  const st=$('stage');
+  st.style.left=FRAME_TL+Math.floor((bw-nW*PX)/2)+'px';st.style.top=FRAME_TL+Math.floor((bh-nH*PX)/2)+'px';
+  if(nW===W&&nH===H&&glCanvas.style.width===nW*PX+'px')return;
+  W=nW;H=nH;
+  renderer.setSize(W,H,false);ov.width=W;ov.height=H;
+  for(const el of[glCanvas,ov,st]){el.style.width=W*PX+'px';el.style.height=H*PX+'px';}
+}
+new ResizeObserver(resize).observe($('box'));addEventListener('resize',resize);resize();
+
+// ================= main loop =================
+buildDriverCards();resetRace();startNightTune();
+let last=performance.now(),panelT=0;
+function frame(now){
+  const dt=Math.min(0.05,(now-last)/1000);last=now;
+  if(!ui.paused&&race.ready){let rem=dt*ui.speed;while(rem>1e-6){const h=Math.min(rem,1/60);stepSim(h);rem-=h;}}
+  updateVisuals(ui.paused?0:dt*ui.speed,now/1000);
+  render(dt,now/1000);
+  panelT-=dt;if(panelT<=0){panelT=0.2;updatePanels();}
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

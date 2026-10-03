@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Race Grid Syndicate</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/game.css">
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div>
+      <h1>RACE GRID SYNDICATE</h1>
+      <p class="sub"><span id="trackName">Victoria Harbour Streets</span></p>
+    </div>
+    <div class="btns">
+      <div class="grp" role="group" aria-label="Main view" title="Keys 1 2 3 switch view (or WATCH on a car), P toggles the small cams. Click a small cam to swap it into the main view."><span>VIEW</span>
+        <button id="v-full" aria-pressed="true">FULL TRACK</button>
+        <button id="v-c1" aria-pressed="false" hidden>CAR 1</button>
+        <button id="v-c2" aria-pressed="false" hidden>CAR 2</button>
+        <button id="pip" aria-pressed="false" hidden>PIP</button>
+      </div>
+      <div class="grp dev-only" role="group" aria-label="Race length"><span>LAPS</span>
+        <button id="l4" aria-pressed="false">4</button>
+        <button id="l6" aria-pressed="true">6</button>
+        <button id="l10" aria-pressed="false">10</button>
+        <button id="l15" aria-pressed="false">15</button>
+      </div>
+      <div class="grp" role="group" aria-label="Sim speed"><span>SIM</span>
+        <button id="s1" aria-pressed="true">1X</button>
+        <button id="s2" aria-pressed="false">2X</button>
+        <button id="s4" aria-pressed="false">4X</button>
+        <button id="pause" aria-pressed="false" title="Space bar">PAUSE</button>
+        <button id="restart" class="dev-only">RESTART</button>
+      </div>
+    </div>
+  </header>
+
+  <section class="stage-wrap" id="wrap">
+    <div class="stage-box" id="box">
+      <div class="stage" id="stage">
+        <canvas id="gl"></canvas>
+        <canvas id="ov"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <section class="drivers" aria-label="Your drivers">
+    <div class="panel drv" id="drv0"></div>
+    <div class="panel drv" id="drv1"></div>
+  </section>
+
+  <aside class="side">
+    <div class="panel tower"><h2>TIMING TOWER</h2><ol id="tower"></ol></div>
+    <div class="panel feed"><h2>COMMS</h2><ol id="feed"></ol></div>
+  </aside>
+</div>
+
+<!-- The track preview: over the race view (not an office screen), so the circuit stays drawn. -->
+<aside class="panel track-preview" id="trackPreview" hidden></aside>
+
+<!-- The office: every decision made away from the track (market, sponsors, staff, the Backer, the Night Tune,
+     the grid, the garage) gets the whole screen. The race screen only shows while a session is running. -->
+<main class="office" id="office">
+  <div class="result" id="creditsOv" hidden><div class="card" id="credits"></div></div>
+  <div class="result" id="newcarOv" hidden><div class="card" id="newcar"></div></div>
+  <div class="result" id="meetOv" hidden><div class="card" id="meet"></div></div>
+  <div class="result" id="draftOv" hidden><div class="card" id="draft"></div></div>
+  <div class="result" id="marketOv" hidden><div class="card" id="market"></div></div>
+  <div class="result" id="staffOv" hidden><div class="card" id="staff"></div></div>
+  <div class="result" id="backerOv" hidden><div class="card" id="backer"></div></div>
+  <div class="result" id="fieldOv" hidden><div class="card" id="field"></div></div>
+  <div class="result" id="sponsorOv" hidden><div class="card" id="sponsors"></div></div>
+  <div class="result" id="qualiOv" hidden><div class="card" id="qres"></div></div>
+  <div class="result" id="tuneOv" hidden><div class="card" id="tune"></div></div>
+  <div class="result" id="result" hidden>
+    <div class="card" id="garage"></div>
+  </div>
+</main>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<!-- Plain scripts sharing one global scope, loaded in dependency order (see docs/ARCHITECTURE.md). -->
+<script src="js/core/util.js"></script>
+<script src="js/data/config.js"></script>
+<script src="js/data/roster.js"></script>
+<script src="js/sim/morale.js"></script>
+<script src="js/render/font.js"></script>
+<script src="js/render/materials.js"></script>
+<script src="js/render/camera.js"></script>
+<script src="js/data/tracks.js"></script>
+<script src="js/data/waters.js"></script>
+<script src="js/data/scenery.js"></script>
+<script src="js/world/water.js"></script>
+<script src="js/world/freeways.js"></script>
+<script src="js/world/circuit.js"></script>
+<script src="js/world/cars.js"></script>
+<script src="js/render/showcase.js"></script>
+<script src="js/render/effects.js"></script>
+<script src="js/sim/race.js"></script>
+<script src="js/sim/combat.js"></script>
+<script src="js/sim/strategy.js"></script>
+<script src="js/sim/step.js"></script>
+<script src="js/sim/quali.js"></script>
+<script src="js/render/visuals.js"></script>
+<script src="js/render/views.js"></script>
+<script src="js/ui/panels.js"></script>
+<script src="js/sim/season.js"></script>
+<script src="js/sim/sponsors.js"></script>
+<script src="js/sim/events.js"></script>
+<script src="js/sim/backer.js"></script>
+<script src="js/sim/staff.js"></script>
+<script src="js/sim/hq.js"></script>
+<script src="js/sim/tiers.js"></script>
+<script src="js/sim/scouting.js"></script>
+<script src="js/sim/parts.js"></script>
+<script src="js/sim/newcar.js"></script>
+<script src="js/sim/fixer.js"></script>
+<script src="js/sim/market.js"></script>
+<script src="js/sim/draft.js"></script>
+<script src="js/ui/garage.js"></script>
+<script src="js/ui/sponsors.js"></script>
+<script src="js/ui/backer.js"></script>
+<script src="js/ui/staff.js"></script>
+<script src="js/ui/market.js"></script>
+<script src="js/ui/draft.js"></script>
+<script src="js/ui/newcar.js"></script>
+<script src="js/ui/field.js"></script>
+<script src="js/ui/fieldplot.js"></script>
+<script src="js/tune/night-tune.js"></script>
+<script src="js/ui/preview.js"></script>
+<script src="js/ui/credits.js"></script>
+<script src="js/ui/controls.js"></script>
+<script src="js/audio/synth.js"></script>
+<script src="js/audio/sequencer.js"></script>
+<script src="js/audio/styles.js"></script>
+<script src="js/audio/sfx.js"></script>
+<script src="js/audio/songs/mountainking.js"></script>
+<script src="js/audio/songs/aase.js"></script>
+<script src="js/audio/songs/chopin4.js"></script>
+<script src="js/audio/songs/gymnopedie.js"></script>
+<script src="js/audio/songs/moonlight.js"></script>
+<script src="js/audio/songs/toccata.js"></script>
+<script src="js/audio/songs/bachprelude.js"></script>
+<script src="js/audio/songs/revolutionary.js"></script>
+<script src="js/audio/songs/dwarfs.js"></script>
+<script src="js/audio/songs/baldmountain.js"></script>
+<script src="js/audio/songs/diesirae.js"></script>
+<script src="js/audio/songs/clairdelune.js"></script>
+<script src="js/audio/songs/anitra.js"></script>
+<script src="js/audio/songs/troldhaugen.js"></script>
+<script src="js/audio/songs/beethoven5.js"></script>
+<script src="js/audio/director.js"></script>
+<script src="js/main.js"></script>
+<script src="js/dev/autoplay.js"></script>
+<script src="js/dev/trackview.js"></script>
+<script src="js/dev/musicview.js"></script>
+<script src="js/dev/sfxview.js"></script>
+<script src="js/dev/stress.js"></script>
+</body>
+</html>

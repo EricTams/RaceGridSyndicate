@@ -26,8 +26,12 @@ const SYNTH_BASE = {
 let SYNTH = JSON.parse(JSON.stringify(SYNTH_BASE));
 
 function audioCtx() {
-  if (AUDIO.ctx) { if (AUDIO.ctx.state === 'suspended') AUDIO.ctx.resume(); return AUDIO.ctx; }
-  const ctx = AUDIO.ctx = new AudioContext();
+  if (AUDIO.ctx) { if (AUDIO.ctx.state !== 'running') AUDIO.ctx.resume(); return AUDIO.ctx; }   // (iOS: 'interrupted' too)
+  // iPhones mute Web Audio with the ringer switch unless the page says it is playing media (Safari 17+).
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch {}
+  const ctx = AUDIO.ctx = new (window.AudioContext || window.webkitAudioContext)();
+  // A silent blip started inside the tap: older iOS only unlocks a context that plays something during the gesture.
+  const blip = ctx.createBufferSource(); blip.buffer = ctx.createBuffer(1, 1, 22050); blip.connect(ctx.destination); blip.start(0);
   const comp = ctx.createDynamicsCompressor();
   comp.threshold.value = -14; comp.ratio.value = 4; comp.attack.value = 0.005; comp.release.value = 0.2;
   AUDIO.master = ctx.createGain(); AUDIO.master.gain.value = 0.6;

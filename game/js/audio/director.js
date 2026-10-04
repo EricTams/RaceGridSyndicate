@@ -76,14 +76,19 @@ function syncAudioUi() {
     '<button data-mute title="Mute everything (M)">MUTE</button>';
   document.body.append(pop, btn);
   syncAudioUi();
-  const start = () => { if (DIRECTOR.on) return; DIRECTOR.on = true; audioCtx(); sfxLoadSamples(); directMusic(); };
+  // Every tap or key retries the unlock until the context runs: a phone ignores a touch's pointerdown (only its
+  // touchend/click count), and suspends audio again after a call or a trip to the home screen.
+  const start = () => {
+    if (DIRECTOR.on) { if (AUDIO.ctx && AUDIO.ctx.state !== 'running') audioCtx(); return; }
+    DIRECTOR.on = true; audioCtx(); sfxLoadSamples(); directMusic();
+  };
   btn.addEventListener('click', () => { start(); pop.hidden = !pop.hidden; });
   pop.addEventListener('input', e => { const k = e.target.dataset.vol; if (k) { start(); setVolume(k, e.target.value / 100); } });
   pop.querySelector('[data-mute]').addEventListener('click', () => { start(); setMuted(!DIRECTOR.muted); });
   addEventListener('pointerdown', e => { if (!pop.hidden && !pop.contains(e.target) && e.target !== btn) pop.hidden = true; }, true);
   // The first click or key anywhere unlocks audio and starts the music (M toggles mute).
   const isM = e => (e.key === 'm' || e.key === 'M') && !(e.target.closest && e.target.closest('input,textarea,select'));
-  addEventListener('pointerdown', e => { if (e.target !== btn) start(); }, true);
+  for (const ev of ['pointerdown', 'touchend', 'click']) addEventListener(ev, e => { if (e.target !== btn) start(); }, true);
   addEventListener('keydown', e => { start(); if (isM(e)) setMuted(!DIRECTOR.muted); });
   // A new weekend: the career's first race weekend (wrapped here, before main.js hands it to the career screens),
   // then every NEXT RACE / END SEASON click.

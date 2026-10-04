@@ -246,6 +246,7 @@ button:disabled{opacity:.4;cursor:not-allowed;animation:none}
 .sp-tag{font-family:"Press Start 2P",monospace;font-size:7px;color:var(--dim);min-width:44px}
 .sp-slot b{font-weight:400}
 .pips{color:var(--cyan);letter-spacing:1px}
+.tcard .pips{display:block;color:var(--gold);font-size:15px;margin-bottom:2px}.gobj .pips{color:var(--gold);margin-right:6px}
 .hq{display:flex;flex-direction:column;gap:4px}
 .gbank{color:var(--gold);font-weight:400}
 .ptab-wrap{overflow-x:auto}
@@ -393,6 +394,5 @@ body.previewing .side,body.previewing .drivers,body.previewing header{visibility
 .track-preview .tp-sub{color:var(--dim)}
 .track-preview dl{display:grid;grid-template-columns:44px minmax(0,1fr);gap:2px 6px}
 .track-preview dt{color:var(--dim)}
-.track-preview .tp-tip{display:block;color:var(--dim);font-size:15px}
 .track-preview ul{padding:0;list-style:none;color:var(--cyan)}
 .track-preview button{margin-top:2px;align-self:stretch}

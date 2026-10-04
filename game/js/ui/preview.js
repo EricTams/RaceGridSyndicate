@@ -19,7 +19,7 @@ function openTrackPreview(then){
     <p class="tp-sub">Inspired by ${TRACK.inspired} · ${LAPS} laps</p>
     <dl>
       <dt>TRACK</dt><dd>${TRACK.tags.map(t=>TAG_LABEL[t]||t.toUpperCase()).join(' · ')||'BALANCED'}</dd>
-      <dt>NIGHT</dt><dd>${w.label}${wid==='clear'?'':`<span class="tp-tip">${w.tip.replace(/^[^:]*: /,'')}</span>`}</dd>
+      <dt>NIGHT</dt><dd${wid==='clear'?'':` title="${w.tip.replace(/^[^:]*: /,'')}"`}>${w.label}</dd>
     </dl>
     ${perks.length?`<p class="tp-h">WORKS FOR YOU HERE</p><ul>${perks.join('')}</ul>`:''}
     <button id="tpGo" title="Enter">TO THE NIGHT TUNE</button>`;

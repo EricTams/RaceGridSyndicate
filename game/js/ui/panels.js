@@ -113,7 +113,7 @@ function updatePanels(){
     // Marker on the fuel bar: where the level will be at the flag on the current order.
     const fl=$(`d${k}fuelF`);fl.hidden=c.state!=='race';fl.style.left=Math.max(0,Math.min(100,flag))+'%';fl.classList.toggle('short',flag<0);
     meter('ammo',c.ammo,AMMO,c.ammo<=0?'#ff3b3b':'#2ef2ff');$(`d${k}ammo`).textContent=c.ammo;
-    const stTxt=race.mode==='quali'?c.qMode==='garage'&&c.qWait!=null?`Out at ${Math.round(c.qWait*12)} min`:{garage:'In the box',out:'Out-lap',flying:'Flying lap',in:'In-lap'}[c.qMode]:c.state==='wreck'?'Wrecked':c.state==='done'?'Cooling down':
+    const stTxt=race.mode==='quali'?c.qMode==='garage'&&c.qGo!=null?`Out at ${qMin(c.qGo)} min`:{garage:'In the box',out:'Out-lap',flying:'Flying lap',in:'In-lap'}[c.qMode]:c.state==='wreck'?'Wrecked':c.state==='done'?'Cooling down':
       c.pit?(c.pit.phase==='stop'?`In the box ${Math.max(0,c.pit.t).toFixed(1)}s`:'Pit lane'):
       c.boxReq?'Boxing this lap':c.spin>0?'Spinning!':c.fuel<=0?'Out of fuel':c.dur<35?'Smoking':race.t<0?'On the grid':
       flag<0?`Fuel −${Math.round(-flag)}%`:`Fuel +${Math.round(flag)}%`;   // tank left at the flag on the current order

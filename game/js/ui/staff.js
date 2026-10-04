@@ -37,9 +37,8 @@ function renderStaff(){
   };
   $('staff').innerHTML=`
     <h3 title="Everyone has four skills (1-5); this role uses the two that are lit. Hover anyone to see what they'd do here. A hire's first season is paid on signing; contracts can't be broken.">CREW · HIRE A ${r.label}</h3>
-    <p class="nt-sub">${r.skills.map((k,i)=>`${k.toUpperCase()}: ${r.what[i]}`).join(' · ')}</p>
     <div class="stsort"><button data-filter="0" aria-pressed="${!staffFreeOnly}">EVERYONE</button><button data-filter="1" aria-pressed="${staffFreeOnly}">AVAILABLE</button></div>
-    <ul class="stlist"><li class="head">${sortHead(staffSort,'name','NAME')}${sortHead(staffSort,'fit','FIT','The average of the two skills this role uses')}${STAFF_SKILLS.map(([k,ab])=>sortHead(staffSort,k,ab,k.toUpperCase()+' 1-5')).join('')}${sortHead(staffSort,'salary','SALARY','A season; the contract runs the years shown')}<span title="Rival staff: their team and role (CC crew chief, PB pit boss, TD technical director, F fixer)">${staffFreeOnly?'':'AT'}</span></li>${people.map(row).join('')}</ul>
+    <ul class="stlist"><li class="head">${sortHead(staffSort,'name','NAME')}${sortHead(staffSort,'fit','FIT','The average of the two skills this role uses')}${STAFF_SKILLS.map(([k,ab])=>sortHead(staffSort,k,ab,k.toUpperCase()+' 1-5'+(r.skills.includes(k)?': '+r.what[r.skills.indexOf(k)]:''))).join('')}${sortHead(staffSort,'salary','SALARY','A season; the contract runs the years shown')}<span title="Rival staff: their team and role (CC crew chief, PB pit boss, TD technical director, F fixer)">${staffFreeOnly?'':'AT'}</span></li>${people.map(row).join('')}</ul>
     <div class="gfoot"><span>${fmtQT(me.cash)} · staff ${staffSalaries().toFixed(2)}M a season</span>
       <span class="btns"><button data-back="1">BACK</button><button data-vacant="1">LEAVE VACANT</button></span></div>`;
   const S=$('staff');popIn(S);
@@ -59,7 +58,7 @@ function renderCrew(){
     const who=p?`<b>${p.name}</b> ${skillPips(p,r.skills)} <span>${p.salary.toFixed(2)}M · ${p.yearsLeft} season${p.yearsLeft>1?'s':''}</span>`
       :league.staffSkipped[r.id]?'<span>Vacant</span>':fixerFirst&&r.id!=='fixer'?`<button disabled title="Hire your fixer first: they negotiate everyone else's contract">HIRE</button>`
       :`<button class="need" data-role="${r.id}">HIRE</button>`;
-    return `<div class="sp-slot${p?'':' open'}" data-pop="st-${r.id}" title="${p?r.effect(p.skills).join('\n'):uses}"><span class="sp-tag">${r.label}</span><span class="who">${who}</span><small class="dim">${uses}</small></div>`;
+    return `<div class="sp-slot${p?'':' open'}" data-pop="st-${r.id}" title="${p?r.effect(p.skills).join('\n'):uses}"><span class="sp-tag">${r.label}</span><span class="who">${who}</span></div>`;
   }).join('');
   $('staff').innerHTML=`
     <h3 title="Anyone can fill any role: each role uses two of the four skills. Your fixer comes first: their NERVE bargains down every contract after. A hire's first season is paid on signing; contracts can't be broken.">${league.season===1&&league.race===1?'BUILD YOUR CREW':`CREW · SEASON ${league.season}`}</h3>

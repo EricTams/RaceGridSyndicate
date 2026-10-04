@@ -2,7 +2,13 @@
 // each hub card opening its own focused screen.
 'use strict';
 
-let garageTab='result';
+let garageTab='result',buildPart=null;   // buildPart: the part whose build cards are open
+// The three build cards for a part: level pips, the jump, build time and the condition it arrives in.
+function buildHtml(id){
+  const me=TEAMS[0];
+  return `<div class="offer mtoffer">${buildOffer(me,id).map((b,i)=>`<button class="tcard need" data-build="${i}" title="Level ${b.lv} of 5">
+    <small class="pips">${'■'.repeat(b.lv)}${'□'.repeat(5-b.lv)} ${b.label}</small>+${buildGain(me,id,b)} levels<br>${buildRaces(me,b)} race${buildRaces(me,b)>1?'s':''} · ${b.cond}% condition</button>`).join('')}</div>`;
+}
 // Called once when the race is settled: open on the race result.
 function openGarage(){garageTab='result';renderGarage();}
 function renderGarage(){
@@ -22,7 +28,7 @@ function renderGarage(){
     const pt=me.parts[id],np=piecePrice(id),items=me.inv.filter(x=>x.id===id).sort((a,b)=>b.level-a.level);
     const full=partsInDev()>=devSlots();
     const build=pt.dev>0?`<span class="dim">${pt.count>1?pt.count+' ':''}NEW IN ${pt.dev} RACE${pt.dev>1?'S':''}</span>${(pt.count||1)<2?`<button data-copy="${id}" title="A second piece of the part in development, arriving with it" ${me.cash<np?'disabled':''}>+1 COPY · ${np.toFixed(2)}</button>`:''}`:
-      `<button data-newpart="${id}" title="${full?'Machine Shop full ('+partsInDev()+'/'+devSlots()+' in development)':'One new '+label.toLowerCase()+', ready in '+myDevRaces()+' races'+(catchUp(pt.level,id)?` (+${catchUp(pt.level,id)} catch-up: it's behind the field)`:'')}" ${me.cash<np||league.devFrozen||full?'disabled':''}>BUILD +${myDevStep()+devBonusLevels()+catchUp(pt.level,id)} · ${np.toFixed(2)}M · ${myDevRaces()} RACES</button>`;
+      `<button data-newpart="${id}" title="${full?'Machine Shop full ('+partsInDev()+'/'+devSlots()+' in development)':'Choose from three designs for a new '+label.toLowerCase()}" ${me.cash<np||league.devFrozen||full?'disabled':''}>BUILD · ${np.toFixed(2)}M</button>`;
     return `<section class="pgroup"><h4>${label}${risky(id)?' <b class="over" title="Under regulation review">REG</b>':''}</h4>${items.map(it=>{
       const on=fittedTo(it),better=!on&&mine.some(c=>carPartLevel(c,id)<it.level)&&itemCond(it)>30;
       return `<div class="pitem" data-pop="fit-${it.uid}"><span>${it.level}</span>${condBar(itemCond(it))}
@@ -44,13 +50,13 @@ function renderGarage(){
     `<button class="need" data-event="${i}" ${o.cost>me.cash?'disabled title="Not enough money"':''}>${o.label}</button>`).join('')}</span></div>`:'';
   // The fixer's call: a few deals, take one or pass.
   const call=league.fixer.call,fx=league.staff.fixer;
-  const callHtml=call?`<p class="nt-sub">${fx.name} has ${call.deals.length>1?`${call.deals.length} deals`:'a deal'} for you. Take one, or pass.</p>${call.deals.map((d,i)=>
+  const callHtml=call?`<p class="nt-sub">${fx.name} has ${call.deals.length>1?`${call.deals.length} deals`:'a deal'} for you.</p>${call.deals.map((d,i)=>
     `<div class="raise"><span><b>${d.title}</b>${d.tier==='clean'?'':` <small class="dim">${d.tier.toUpperCase()}</small>`} · ${d.text}</span><span class="btns">${d.attack?`<button class="need" data-fixer-pick="${i}" ${d.cost>me.cash?'disabled title="Not enough money"':''}>PICK A RIVAL · −${d.cost.toFixed(2)}M: ${d.what.toUpperCase()}</button>`
       :`<button class="need" data-fixer="${i}" ${d.cost>me.cash?'disabled title="Not enough money"':''}>${d.label}</button>`}</span></div>`).join('')}`:'';
   // An attack's target: every rival with what your fixer knows of their NERVE, and what that means for this move.
   const pick=call&&call.deals[league.fixer.pick],myN=fixerNerve(me);
-  const targetHtml=pick?`<p class="nt-sub">${pick.title}: works only on a fixer with less NERVE than yours (<b>${myN}</b>), and the gap sets how hard it hits.
-    If theirs is as high, they shut it down: you've paid, Corporate Standing −4, and they know it was you.</p><ul class="stlist fxlist"><li class="head"><span>TEAM</span><span>POS</span><span>THEIR NERVE</span><span>IF YOU GO</span><span></span></li>${
+  const nerveTip=`Works only on a fixer with less NERVE than yours, and the gap sets how hard it hits. If theirs is as high, they shut it down: you've paid, Corporate Standing −4, and they know it was you.`;
+  const targetHtml=pick?`<p class="nt-sub">Your NERVE <b>${myN}</b></p><ul class="stlist fxlist"><li class="head"><span>TEAM</span><span>POS</span><span title="${nerveTip}">THEIR NERVE</span><span title="${nerveTip}">IF YOU GO</span><span></span></li>${
     teamStandings().filter(r=>r!==me).map(r=>{const rd=nerveRead(me,r),lo=myN-rd.hi,hi=myN-rd.lo;
       const verdict=lo>0?`WORKS: ${pick.effect(lo)}${hi>lo?` (up to ${pick.effect(hi).replace(/^their /,'')})`:''}`:hi<=0?'SHUT DOWN':'MAYBE';
       return `<li><b>${r.name}</b><span>P${standingPos(r)}</span><span>${readText(rd)}</span><span class="${lo>0?'':hi<=0?'bad':'dim'}">${verdict}</span><button class="need" data-attack="${r.id}">GO</button></li>`;}).join('')}</ul>`:'';
@@ -98,12 +104,14 @@ function renderGarage(){
     schedule:['CALENDAR',scheduleHtml,back],
     standings:['STANDINGS',standingsHtml,back],
     goals:['GOALS',`${backerHtml}${sponsorsHtml}`,back],
-    cars:['CARS',`${reg}<p class="nt-sub">Each part: its level and condition.</p><div class="pcars">${carCols}</div>${plotWidget('cars')}`,back],
-    studio:['DESIGN STUDIO',`<p class="nt-sub">${studioSlots(me)?'Projects don\'t help this season: their levels go into next season\'s new car.':'Build the Design Studio in HQ to start next-year projects.'}</p><div class="pstock">${PARTS.map(({id,label})=>{
+    cars:['CARS',`${reg}<div class="pcars">${carCols}</div>${plotWidget('cars')}`,back],
+    studio:['DESIGN STUDIO',`${studioSlots(me)?'':'<p class="nt-sub">Build the Design Studio in HQ to start next-year projects.</p>'}<div class="pstock">${PARTS.map(({id,label})=>{
       const on=(me.studio||[]).find(p=>p.id===id),bank=(me.nextYear||{})[id]||0,full=(me.studio||[]).length>=studioSlots(me);
       return `<section class="pgroup"><h4>${label}</h4><div>${bank?`+${bank} banked for next year`:'Nothing banked'}</div>${on?`<span class="dim">+${on.gain} in ${on.left} race${on.left>1?'s':''}</span>`
-        :`<button data-studio="${id}" ${full?`disabled title="${studioSlots(me)?'Studio full':'Build the Design Studio in HQ first'}"`:me.cash<studioCost()?'disabled title="Not enough money"':''}>START +${studioGainFor(skillOf(me,'techdir','design'))} · ${studioCost().toFixed(2)}</button>`}</section>`;}).join('')}</div>`,back],
-    workshop:['WORKSHOP',`${reg}<p class="nt-sub">Every piece you own: its level, its condition, and which car it's on. CARS shows each part against the field.</p><div class="pstock">${stock}</div>`,back],
+        :`<button data-studio="${id}" ${full?`disabled title="${studioSlots(me)?'Studio full':'Build the Design Studio in HQ first'}"`:me.cash<studioCost()?'disabled title="Not enough money"':''}>START +${studioGainFor(skillOf(me,'techdir','design'))} · ${studioCost().toFixed(2)}</button>`}</section>`;}).join('')}</div>`,back,'Projects don\'t help this season: their levels go into next season\'s new car.'],
+    build:buildPart?[`BUILD A NEW ${PARTS.find(p=>p.id===buildPart).label} · ${piecePrice(buildPart).toFixed(2)}M`,buildHtml(buildPart),`<button data-gtab="workshop">BACK</button>`,
+      `Your technical director's DESIGN sets how high each design's level tends to be; MECHANICAL sets the base build time.${catchUp(me.parts[buildPart].level,buildPart)?` Includes +${catchUp(me.parts[buildPart].level,buildPart)} catch-up: this part is behind the field.`:''}`]:[],
+    workshop:['WORKSHOP',`${reg}<div class="pstock">${stock}</div>`,back],
     team:['TEAM',`<section class="gdrivers">${drivers}</section><h4>STAFF</h4><ul class="gobj">${STAFF_ROLES.map(r=>{const x=league.staff[r.id];
       const k=x?x.skills:{mechanical:1,design:1,people:1,nerve:1};
       return `<li title="${r.effect(k).join('\n')}">${r.label} · ${x?`${x.name} ${skillPips(x)} · ${x.yearsLeft} season${x.yearsLeft>1?'s':''} left`:'vacant'}</li>`;}).join('')}</ul>${seesRivalStaff()?`<h4>RIVAL STAFF</h4><ul class="gobj">${TEAMS.filter(t=>!t.you).map(t=>`<li>${t.name}: ${STAFF_ROLES.map(r=>{const p=t.staff[r.id];return p?`<span title="${r.label}">${p.name} (${p.yearsLeft})</span>`:'—';}).join(' · ')}</li>`).join('')}</ul>`:''}`,back],
@@ -112,7 +120,7 @@ function renderGarage(){
         <span>${r.levels[l]}${l<3?` <span class="dim">→ level ${l+1}: ${r.levels[l+1]}</span>`:''}</span>${l<3?(r.id==='front'&&!league.hqPath?['street','corp'].map(pth=>`<button data-hq="front" data-path="${pth}" ${me.cash<cost?'disabled':''} title="Level 1: ${r.levels[1]}">${pth==='street'?'STREET FRONT':'CORPORATE SUITE'} · ${cost.toFixed(2)}M</button>`).join(''):
           `<button data-hq="${r.id}" ${me.cash<cost?'disabled':''} title="Level ${l+1}: ${r.levels[l+1]}">${r.id==='front'?(league.hqPath==='street'?'STREET FRONT ':'CORPORATE SUITE '):''}LEVEL ${l+1} · ${cost.toFixed(2)}M</button>`):''}</div>`;}).join('')}</div>`).join(''),back],
   }[garageTab]||[];
-  $('garage').innerHTML=`<div class="nt-top"><h3>${view[0]}</h3><span class="gbank">${fmtQT(me.cash)}</span></div>
+  $('garage').innerHTML=`<div class="nt-top"><h3${view[3]?` title="${view[3]}"`:''}>${view[0]}</h3><span class="gbank">${fmtQT(me.cash)}</span></div>
     ${garageTab==='hub'?lastReg:''}${view[1]}<div class="gfoot"><span></span>${view[2]}</div>`;
   popIn($('garage'));bankPop($('garage'),'garage');
   plotAnimate($('garage'));
@@ -130,7 +138,8 @@ function renderGarage(){
   $('garage').querySelectorAll('[data-studio]').forEach(b=>b.addEventListener('click',()=>{startStudio(me,b.dataset.studio);renderGarage();}));
   $('garage').querySelectorAll('[data-copy]').forEach(b=>b.addEventListener('click',()=>{addPartCopy(b.dataset.copy);renderGarage();}));
   $('garage').querySelectorAll('[data-fit]').forEach(b=>b.addEventListener('click',()=>{fitPart(mine[+b.dataset.car],+b.dataset.fit);renderGarage();}));
-  $('garage').querySelectorAll('[data-newpart]').forEach(b=>b.addEventListener('click',()=>{
-    developPart(me,b.dataset.newpart);renderGarage();updateHeader();}));
+  $('garage').querySelectorAll('[data-newpart]').forEach(b=>b.addEventListener('click',()=>{buildPart=b.dataset.newpart;garageTab='build';renderGarage();}));
+  $('garage').querySelectorAll('[data-build]').forEach(b=>b.addEventListener('click',()=>{
+    developPart(me,buildPart,buildOffer(me,buildPart)[+b.dataset.build]);buildPart=null;garageTab='workshop';renderGarage();updateHeader();}));
   $('nextRace')&&$('nextRace').addEventListener('click',nextRace);
 }

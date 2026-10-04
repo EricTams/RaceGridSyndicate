@@ -326,9 +326,9 @@ function renderTune(){
   const canRun=ntStage==='quali'&&c.qMode==='garage'&&c.qSets>0&&race.t<QUALI_SECONDS&&readyToRun(c);
   let act;
   if(!t.lapReady&&!t.locked)act=`<button id="ntPass">PASS</button>`;
-  else if(ntStage==='tune')act=`${cmpPick}<button id="ntStart" title="Both cars head out as the session opens">GO NOW</button><button id="ntStartWait" title="The track rubbers in: later runs are quicker. Both cars go out about 4 minutes in">WAIT FOR GRIP</button>`;
+  else if(ntStage==='tune')act=`${cmpPick}<button id="ntStart" title="Both cars head out as the session opens, a few seconds apart">GO NOW</button><button id="ntStartWait" title="The track rubbers in: later runs are quicker. Both cars go out about 4 minutes in, each timed for a gap in traffic">WAIT FOR GRIP</button>`;
   else if(t.lapReady&&!t.locked&&t.phase===LAST_PHASE)act=`<button id="ntLock">LOCK IN ${c.name}</button>`;
-  else if(canRun)act=`${cmpPick}<button id="ntSend">GO NOW</button>${qWaitAt(c)!=null?`<button id="ntWait" title="The track rubbers in: later runs are quicker">WAIT FOR GRIP</button>`:''}${t.locked?`<button id="ntClose">STAY IN</button>`:''}`;
+  else if(canRun)act=`${cmpPick}<button id="ntSend">GO NOW</button>${qWaitAt(c)!=null?`<button id="ntWait" title="The track rubbers in: later runs are quicker. Goes out when there's a gap in traffic">WAIT FOR GRIP</button>`:''}${t.locked?`<button id="ntClose">STAY IN</button>`:''}`;
   else if(ntStage==='quali')act=`<button id="ntClose">BACK TO THE SESSION</button>`;
   else if(t.lapReady&&!t.locked)act=`<button id="ntSkip">CONTINUE WITHOUT A LAP</button>`;
   else act=allLocked?`<button id="ntGrid">TO THE GRID</button>`:`<button id="ntNext">TUNE ${other.name}</button>`;

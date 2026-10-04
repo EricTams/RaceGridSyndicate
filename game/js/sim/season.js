@@ -28,14 +28,35 @@ function settleRace(order){
     say(`Rules committee names ${league.review.map(x=>x.toUpperCase()).join(' and ')} for review. One gets new regs next season.`,'bad');
   }
 }
+// A new part arrives at the level and condition its build card promised (pt.build).
 function partArrives(t,id){
-  const pt=t.parts[id],label=PARTS.find(p=>p.id===id).label;pt.dev=0;
-  if(t.you){sfx('arrive');const lv=pt.level+myDevStep()+devBonusLevels()+catchUp(pt.level,id),n=pt.count||1;for(let k=0;k<n;k++)addPartItem(id,lv);pt.count=0;
-    say(`Garage: ${n>1?`${n} new ${label.toLowerCase()}s are`:`a new ${label.toLowerCase()} is`} ready (level ${lv}). Fit ${n>1?'them':'it'} to your cars.`,'you');}
-  else{pt.level+=devStepFor(skillOf(t,'techdir','design'))+catchUp(pt.level,id);cars.filter(c=>c.team===t).forEach(c=>c.cond[id]=100);}
+  const pt=t.parts[id],label=PARTS.find(p=>p.id===id).label,b=pt.build||{gain:7,cond:100};pt.dev=0;pt.build=null;
+  if(t.you){sfx('arrive');const lv=pt.level+buildGain(t,id,b),n=pt.count||1;for(let k=0;k<n;k++)addPartItem(id,lv).cond=b.cond;pt.count=0;
+    say(`Garage: ${n>1?`${n} new ${label.toLowerCase()}s are`:`a new ${label.toLowerCase()} is`} ready (level ${lv}, ${b.cond}% condition). Fit ${n>1?'them':'it'} to your cars.`,'you');}
+  else{pt.level+=buildGain(t,id,b);cars.filter(c=>c.team===t).forEach(c=>c.cond[id]=b.cond);}
 }
-// AI garages develop at their technical director's pace (DESIGN: how far, MECHANICAL: how fast).
-function developPart(t,id){const pt=t.parts[id];if(t.you){sfx('clank');uiPop='part-'+id;pt.count=1;}t.cash-=t.you?piecePrice(id):newPartCost(pt.level,id);pt.dev=devRacesFor(skillOf(t,'techdir','mechanical'));}
+// ---- building a new part: three cards, one per style, each with a level drawn from the technical director's
+// DESIGN (the design meeting's curve at its STANDARD spread; nothing widens it). The style trades the jump against
+// build time and the condition the piece arrives in; the level sizes the jump. The technical director's
+// MECHANICAL still sets the base build time.
+const BUILD_STYLES=[{id:'perf',label:'PERFORMANCE',gain:5,races:1,cond:80},{id:'quick',label:'QUICK',gain:3,races:-1,cond:90},
+  {id:'robust',label:'ROBUST',gain:4,races:0,cond:100}];
+const BUILD_CONC=7;
+const buildRaces=(t,b)=>Math.max(1,devRacesFor(skillOf(t,'techdir','mechanical'))+b.races);
+const buildGain=(t,id,b)=>b.gain+(t.you?devBonusLevels():0)+catchUp(t.parts[id].level,id);
+function buildCard(t,st){const lv=cardLevel(skillOf(t,'techdir','design'),BUILD_CONC);return {style:st.id,label:st.label,lv,gain:st.gain+lv,races:st.races,cond:st.cond};}
+// A part's three cards are dealt once and kept until one is built: backing out never re-deals.
+function buildOffer(t,id){const o=t.buildOffers||(t.buildOffers={});return o[id]||(o[id]=BUILD_STYLES.map(st=>buildCard(t,st)));}
+// AI managers (and autoplay) pick by tactics: rookies at random, the others weigh the jump against time and condition.
+function aiBuildPick(t,id){
+  const offer=buildOffer(t,id),tac=(t.mgr&&t.mgr.tactics)||'pro';if(tac==='rookie')return choice(offer);
+  const [w,v]=tac==='elite'?[0.08,1]:[0.05,0.5],val=b=>b.gain-w*(100-b.cond)-v*buildRaces(t,b);
+  return offer.reduce((a,b)=>val(b)>val(a)?b:a);
+}
+function developPart(t,id,card=aiBuildPick(t,id)){
+  const pt=t.parts[id];if(t.you){sfx('clank');uiPop='part-'+id;pt.count=1;}
+  t.cash-=t.you?piecePrice(id):newPartCost(pt.level,id);pt.dev=buildRaces(t,card);pt.build=card;delete t.buildOffers[id];
+}
 // Your builds make one piece; a part already in development can have a second copy added (no extra Machine Shop slot).
 const piecePrice=id=>newPartCost(TEAMS[0].parts[id].level,id)/2;
 function addPartCopy(id){const pt=TEAMS[0].parts[id];if(pt.dev<=0)return;sfx('clank');TEAMS[0].cash-=piecePrice(id);pt.count=(pt.count||1)+1;uiPop='part-'+id;}   // your technical director sets both

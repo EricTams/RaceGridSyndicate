@@ -12,7 +12,6 @@ const feedbackMulFor=s=>1.15-0.075*s;                              // driver fee
 const pitMulFor=s=>1.1-0.075*s;                                    // stop time
 const wearMulFor=s=>1-(s-1)*0.06;                                  // part wear in races
 const pitRepairFor=s=>5*s;                                         // % condition back on the most worn part at each stop
-const devStepFor=s=>s>=5?8:7;                                      // levels a new part gains
 const devRacesFor=s=>s>=4?2:3;                                     // races to build it
 const offerMulFor=s=>1+(s-1)*0.05;                                 // sponsor offers
 const eventMulFor=s=>1-(s-1)*0.1;                                  // event costs
@@ -26,14 +25,16 @@ const STAFF_ROLES=[
   {id:'fixer',label:'FIXER',group:'STRATEGIC',skills:['people','nerve'],what:['sponsor offers, driver scouting and deals','contracts, keeping the heat off drivers, event and deal costs, dirty deals'],
     effect:k=>[`PEOPLE: sponsor offers ${pct(offerMulFor(k.people)-1)}${k.people>=4?' and a 4th offer':''}; drivers: ${k.people>=4?'growth shown, a 4th candidate':k.people>=2?'growth shown':'no insight'}`,
       `PEOPLE: a deal call after ${Math.round(FIXER_CALL[k.people]*100)}% of races${k.people>=3?', connected deals':''}`,
-      `NERVE: event and deal costs ${pct(eventMulFor(k.nerve)-1)}, contracts ${pct(bargainFor(k.nerve)-1)}, drivers' morale hits ${pct(fixerHeatFor(k.nerve)-1)}, wrecked drivers ${k.nerve>=4?`fired up +${[0,0,0,0,2,4][k.nerve]}`:'hurt −6'}, failed parts patched +${20*k.nerve}%, damages from softer fixers${k.nerve>=4?', every dirty deal':k.nerve>=3?', dirty deals':''}`]},
+      `NERVE: event and deal costs ${pct(eventMulFor(k.nerve)-1)}, contracts ${pct(bargainFor(k.nerve)-1)}, drivers' morale hits ${pct(fixerHeatFor(k.nerve)-1)}, wrecked drivers ${k.nerve>=4?`fired up +${[0,0,0,0,2,4][k.nerve]}`:'hurt −6'}, failed parts patched +${20*k.nerve}%, damages from softer fixers${k.nerve>=4?', every dirty deal':k.nerve>=3?', dirty deals':''}`,
+      `MECHANICAL: their design-meeting card averages level ${cardLevelAvg(k.mechanical).toFixed(1)} of 5`]},
   {id:'chief',label:'CREW CHIEF',group:'RACE DAY',skills:['design','people'],what:['Night Tune cards and sweet spots','driver feedback, DIAL IT IN cards and resting morale'],
     effect:k=>[`DESIGN: ${chiefAimFor(k.design)}% of Night Tune cards aimed at what the car needs, ${chiefExtraFor(k.design)}% chance of a 4th card, sweet spot within ${5+0.5*(k.design-1)}${k.design>=4?', +1 final-tune pick':''}`,
-      `PEOPLE: driver feedback noise ${pct(feedbackMulFor(k.people)-1)}, ${2*(k.people-1)}% of cards DIAL IT IN once there's feedback, morale rests ${2*(k.people-1)} higher`]},
+      `PEOPLE: driver feedback noise ${pct(feedbackMulFor(k.people)-1)}, ${2*(k.people-1)}% of cards DIAL IT IN once there's feedback, morale rests ${2*(k.people-1)} higher`,
+      `MECHANICAL: their design-meeting card averages level ${cardLevelAvg(k.mechanical).toFixed(1)} of 5`]},
   {id:'pit',label:'PIT BOSS',group:'RACE DAY',skills:['nerve','mechanical'],what:['pit stop time','part wear and repairs at the stop'],
-    effect:k=>[`NERVE: pit stops take ${Math.round(pitMulFor(k.nerve)*100)}% of normal time`,`MECHANICAL: part wear in races ${pct(wearMulFor(k.mechanical)-1)}, +${pitRepairFor(k.mechanical)}% on the most worn part at each stop`]},
+    effect:k=>[`NERVE: pit stops take ${Math.round(pitMulFor(k.nerve)*100)}% of normal time`,`MECHANICAL: part wear in races ${pct(wearMulFor(k.mechanical)-1)}, +${pitRepairFor(k.mechanical)}% on the most worn part at each stop, design-meeting card averages level ${cardLevelAvg(k.mechanical).toFixed(1)} of 5`]},
   {id:'techdir',label:'TECHNICAL DIRECTOR',group:'STRATEGIC',skills:['design','mechanical'],what:['how far new parts jump','how fast they\'re built'],
-    effect:k=>[`DESIGN: new parts +${devStepFor(k.design)} levels`,`MECHANICAL: ready in ${devRacesFor(k.mechanical)} races`]},
+    effect:k=>[`DESIGN: new-part designs average level ${cardLevelAvg(k.design).toFixed(1)} of 5, keeps ${Math.round(carryFor(k.design)*100)}% of each part's level above the baseline into next season`,`MECHANICAL: ready in ${devRacesFor(k.mechanical)} races, design-meeting cards average level ${cardLevelAvg(k.mechanical).toFixed(1)} of 5`]},
 ];
 const roleById=id=>STAFF_ROLES.find(r=>r.id===id);
 // A team's skill in a role (1 when the role is vacant), and your team's shortcuts.
@@ -42,7 +43,6 @@ const skillOf=(t,role,skill)=>{const s=(t.staff&&t.staff[role]&&t.staff[role].sk
 const mySkill=(role,skill)=>skillOf(TEAMS[0],role,skill);
 const engineerWear=()=>wearMulFor(mySkill('pit','mechanical'));
 const pitCrewMul=()=>pitMulFor(mySkill('pit','nerve'));
-const myDevStep=()=>devStepFor(mySkill('techdir','design'));
 const myDevRaces=()=>devRacesFor(mySkill('techdir','mechanical'));
 const commercialMul=()=>offerMulFor(mySkill('fixer','people'));
 const fixerMul=()=>eventMulFor(mySkill('fixer','nerve'));
@@ -79,6 +79,7 @@ const freeStaff=()=>league.staffPool.filter(p=>!p.team);
 function joinTeam(t,role,p){
   p.salary=contractFor(t,p.salary);   // the list price, less the team's fixer's bargain (fixed for the contract)
   p.team=t.id;p.role=role;p.yearsLeft=p.years;p.hiredSeason=league.season;(t.staff||(t.staff={}))[role]=p;
+  if(role==='techdir')t.buildOffers={};   // a new technical director brings their own designs
 }
 // An AI manager hires for a role: rookies go for the flashiest skill, pros for the fit, elites for fit per QT.
 function aiPickStaff(t,role,pool){

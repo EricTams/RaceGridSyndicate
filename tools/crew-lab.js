@@ -14,12 +14,17 @@
 //       cash, manager, reputation and drivers, and a background crew drawn like the staff pool), so rival crews
 //       have a real spread of skills. grid 'flat': identical teams with every other skill at `base`.
 //   mode 'race': single races on fresh, equal cars, every track (race-day effects only).
+//   mode 'random': season runs (as above, real grid) where every team's crew has ALL 16 skills (4 roles × 4
+//     skills, off-role ones included) rolled at random 1-5. Then a least-squares fit per metric, controlling for
+//     each grid slot: what one point of each skill is worth, with its standard error. Lit (primary) skills are
+//     marked *. Settings: runs (default 60), seasons.
 //
 // Run it with: node tools/headless-shot.mjs out.png "$(cat tools/crew-lab.js)"
 // Settings: window.CREW_LAB = {mode:'season', grid:'real', seasons:2, roles:['fixer','chief','pit','techdir'], lo:1,
 // hi:5, reps:10} before the script. reps: rotations of 4 runs (seasons, or races per track in race mode).
+// Random mode: window.CREW_LAB = {mode:'random', runs:60, seasons:2}.
 (() => {
-  const CFG = Object.assign({mode: 'season', grid: 'real', seasons: 2, roles: STAFF_ROLES.map(r => r.id), lo: 1, hi: 5, reps: 10, base: 3, tracks: null},
+  const CFG = Object.assign({mode: 'season', grid: 'real', seasons: 2, roles: STAFF_ROLES.map(r => r.id), lo: 1, hi: 5, reps: 10, base: 3, tracks: null, runs: 60},
     window.CREW_LAB || {});
   const DRV = {pace: 70, racecraft: 70, tires: 70, fuel: 70, gunnery: 70, composure: 70, feedback: 70, fame: 50};
   const realRandom = Math.random;
@@ -58,6 +63,8 @@
     sk[B] = v === 2 || v === 3 ? CFG.hi : CFG.lo;
     return Object.fromEntries(STAFF_ROLES.map(r => [r.id, person(r.id === roleId ? sk : {...(bg ? bg[r.id] : flat)})]));
   }
+  // Random mode: every skill of every role rolled 1-5 (Math.random is the run's seeded rng by then).
+  const randomCrew = () => Object.fromEntries(STAFF_ROLES.map(r => [r.id, person(Object.fromEntries(STAFF_SKILLS.map(([k]) => [k, 1 + Math.floor(Math.random() * 5)])))]));
   function hireCrew(t, staff) {
     t.staff = {};
     STAFF_ROLES.forEach(r => { const p = staff[r.id]; p.salary = contractFor(t, staffList(p.skills)); t.staff[r.id] = p; });   // the fixer is hired first
@@ -133,13 +140,13 @@
     TEAMS.forEach((t, i) => {
       const v = (i + rotation) % 4, pf = profiles && profiles[i];
       t.labVariant = v;
-      t.lab = {rebuilds: 0, devs: 0, spent: 0, deals: 0, fixerCash: 0, payroll: 0, sponsors: 0, bonus: 0, short: 0, prize: 0, raises: 0, cashStart: [], fee1: [], feeN: [], noShort: [], rows: [[], []], pts: [], designed: [], level: [], cash: []};
+      t.lab = {rebuilds: 0, devs: 0, spent: 0, deals: 0, fixerCash: 0, payroll: 0, sponsors: 0, bonus: 0, short: 0, prize: 0, raises: 0, cashStart: [], fee1: [], feeN: [], noShort: [], rows: Array.from({length: CFG.seasons}, () => []), pts: [], designed: [], level: [], cash: []};
       if (pf) Object.assign(t, ROSTER[i], {mgr: {...pf.mgr}, cash: pf.cash, seed: pf.seed});
       else Object.assign(t, {plan: 'std', guns: 'std', mines: 1, armor: 1, pace: 0, mgr: {business: 'pro', tactics: 'pro'}, cash: 3.5 * tierMoney(), seed: 'lower'});
       setRep(t, pf ? pf.rep : 40); t.lastPos = undefined;
       Object.assign(t, {studio: [], nextYear: {}, carry: null, sponsors: {main: null, short: null}, offers: {}, skipped: {}});
       PARTS.forEach(p => Object.assign(t.parts[p.id], {level: pf ? pf.parts[p.id] : tierBaseline(0), dev: 0, count: 0}));
-      hireCrew(t, crewFor(roleId, v, pf && pf.crew));
+      hireCrew(t, roleId ? crewFor(roleId, v, pf && pf.crew) : randomCrew());
       // drivers: the slot's own (real) or the same pair for everyone (flat); signed at list less the fixer's bargain
       t.drvs.forEach((d, k) => {
         const src = pf ? pf.drivers[k] : {stats: {...DRV}, abilities: []};
@@ -191,7 +198,7 @@
     Math.random = realRandom;
     return TEAMS.map(t => {
       const all = t.lab.rows.flat(), m = k => mean(all.filter(x => x[k] != null).map(x => x[k])), L = t.lab;
-      const row = {v: t.labVariant, pts: L.pts.reduce((a, b) => a + b, 0), pos: m('pos'), grid: m('grid'), golds: m('golds'), grade: m('grade'),
+      const row = {v: t.labVariant, slot: TEAMS.indexOf(t), skills: STAFF_ROLES.flatMap(r => STAFF_SKILLS.map(([k]) => t.staff[r.id].skills[k])), pts: L.pts.reduce((a, b) => a + b, 0), pos: m('pos'), grid: m('grid'), golds: m('golds'), grade: m('grade'),
         pit: m('pit'), startCond: m('startCond'), morale: m('morale'), fails: all.reduce((a, x) => a + x.fails, 0) / 2, dnf: m('dnf'),
         devs: L.devs, rebuilds: L.rebuilds, spent: L.spent, payroll: L.payroll, sponsors: L.sponsors + L.short + L.bonus, deals: L.deals, fixerCash: L.fixerCash, cash: t.cash};
       L.pts.forEach((p, s) => { row['pts' + (s + 1)] = p; row['lvl' + (s + 1)] = L.designed[s]; row['end' + (s + 1)] = L.level[s]; });
@@ -219,6 +226,41 @@
   const season = CFG.mode === 'season', METRICS = season ? SEASON_METRICS : RACE_METRICS;
   out.push(season ? `CREW LAB · ${CFG.seasons} SEASON${CFG.seasons > 1 ? 'S' : ''} A RUN · ${CFG.grid === 'real' ? 'a real grid (slots rotate)' : `identical teams (others ${CFG.base})`} · skills LOW ${CFG.lo} / HIGH ${CFG.hi} · ${4 * CFG.reps} runs of ${racesThisSeason()} races a season per role`
     : `CREW LAB · RACES · identical teams · skills LOW ${CFG.lo} / HIGH ${CFG.hi} (others ${CFG.base}) · ${tracks.length} tracks × ${4 * CFG.reps} races`);
+  // ---- random mode: least squares over every team-run, skills plus a dummy per grid slot ----
+  if (CFG.mode === 'random') {
+    const rows = [];
+    for (let r = 0; r < CFG.runs; r++) rows.push(...seasonRun(9000 + r * 131, null, 0));
+    const names = STAFF_ROLES.flatMap(role => STAFF_SKILLS.map(([k, ab]) => ({label: `${roleShort(role.id)} ${ab}`, lit: role.skills.includes(k)})));
+    const nS = names.length, nT = TEAMS.length, nX = nS + nT;
+    const X = rows.map(row => [...row.skills.map(x => x - 3), ...TEAMS.map((_, i) => row.slot === i ? 1 : 0)]);
+    // (X'X)^-1 once, by Gauss-Jordan; the same for every metric
+    const A = Array.from({length: nX}, (_, i) => [...Array.from({length: nX}, (_, j) => X.reduce((a, x) => a + x[i] * x[j], 0)), ...Array.from({length: nX}, (_, j) => i === j ? 1 : 0)]);
+    for (let c = 0; c < nX; c++) {
+      let p = c; for (let r = c + 1; r < nX; r++) if (Math.abs(A[r][c]) > Math.abs(A[p][c])) p = r;
+      [A[c], A[p]] = [A[p], A[c]]; const d = A[c][c]; for (let j = 0; j < 2 * nX; j++) A[c][j] /= d;
+      for (let r = 0; r < nX; r++) if (r !== c && A[r][c]) { const m = A[r][c]; for (let j = 0; j < 2 * nX; j++) A[r][j] -= m * A[c][j]; }
+    }
+    const inv = A.map(r => r.slice(nX));
+    const RM = [['pts', 'pts/car', 2], ...Array.from({length: CFG.seasons}, (_, s) => [`lvl${s + 1}`, `car lvl S${s + 1}`, 2]), [`pts${CFG.seasons}`, `pts S${CFG.seasons}`, 2], ['pos', 'avg finish', 2], ['golds', 'golds/race', 2],
+      ['pit', 'pit s/race', 2], ['fails', 'fails/car', 2], ['morale', 'morale', 1], ['sponsors', 'sponsors M', 2], ['cash', 'cash end', 2]];
+    const fits = RM.map(([k]) => {
+      const ok = rows.map((row, i) => [row[k], X[i]]).filter(([y]) => y != null && !isNaN(y));
+      const xty = Array.from({length: nX}, (_, j) => ok.reduce((a, [y, x]) => a + x[j] * y, 0));
+      const b = inv.map(r => r.reduce((a, v, j) => a + v * xty[j], 0));
+      const sse = ok.reduce((a, [y, x]) => a + (y - x.reduce((s, v, j) => s + v * b[j], 0)) ** 2, 0), s2 = sse / Math.max(1, ok.length - nX);
+      return b.map((v, j) => [v, Math.sqrt(s2 * inv[j][j])]);
+    });
+    out.length = 0;
+    out.push(`CREW LAB · RANDOM SKILLS · ${CFG.runs} runs × ${nT} teams × ${CFG.seasons} season${CFG.seasons > 1 ? 's' : ''} · each cell: change per skill point ± standard error · * primary (lit) skill · ! = 2+ SE from zero`);
+    out.push('skill'.padEnd(8) + RM.map(([, l]) => l.padStart(14)).join(''));
+    names.forEach((n, j) => out.push(`${n.label}${n.lit ? '*' : ' '}`.padEnd(8) + RM.map(([, , d], m) => {
+      const [v, e] = fits[m][j], sig = Math.abs(v) >= 2 * e ? '!' : ' ';
+      return `${f(v, d)}±${e.toFixed(d)}${sig}`.padStart(14);
+    }).join('')));
+    out.push('', 'field average: ' + Array.from({length: CFG.seasons}, (_, s) => `car lvl S${s + 1} ${mean(rows.map(r => r['lvl' + (s + 1)])).toFixed(1)} → end ${mean(rows.map(r => r['end' + (s + 1)])).toFixed(1)}`).join(' · '));
+    out.push(`(${rows.length} team-runs · ${Math.round((performance.now() - t0) / 1000)}s)`);
+    const text = out.join('\n');console.log(text);return text;
+  }
   for (const roleId of CFG.roles) {
     const role = roleById(roleId), [A, B] = role.skills;
     // The unit is a group of 4 runs that rotate the variants through every slot: each variant's mean over the group,

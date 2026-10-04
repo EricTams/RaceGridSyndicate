@@ -27,7 +27,7 @@ function renderSponsors(){
   const perRace=sponsorPerRace();
   $('sponsors').innerHTML=`
     <h3>${season?`SEASON SPONSOR · SEASON ${league.season}`:`SHORT-TERM SPONSOR · RACE ${league.race}`}</h3>
-    <p class="nt-sub" title="Each deal pays a fee every race plus a bonus if you hit its target. Street brands price from your Street Cred, corporate brands from your Corporate Standing. Deals can't be broken.${season?' Your season sponsor\'s color goes on your cars.':''}">Street Cred ${me.street} · Corporate Standing ${me.corp} (brands price their offers from these) · ${season?'Team standings count at the end of the season.':'Either car counts; a car that doesn\'t finish (DNF) doesn\'t.'}</p>
+    <p class="nt-sub" title="Each deal pays a fee every race plus a bonus if you hit its target. Street brands price from your Street Cred, corporate brands from your Corporate Standing. ${season?'The target counts your team standing at the end of the season.':'Either car can hit the target; a car that doesn\'t finish (DNF) doesn\'t count.'} Deals can't be broken.${season?' Your season sponsor\'s color goes on your cars.':''}">Street Cred ${me.street} · Corporate Standing ${me.corp}</p>
     <div class="sp-list">${rows}</div>
     <div class="gfoot"><span>Signed: +${perRace.toFixed(2)}M QT a race</span>
       <button id="spDone" ${openSlots(sponsorTerm).length?'disabled title="Sign or leave it empty"':''}>${season?'CONTINUE':'TO THE NIGHT TUNE'}</button></div>`;

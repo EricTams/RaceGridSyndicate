@@ -137,6 +137,7 @@ function stepSim(dt){
         damage(c,rand(10,14),m.owner,'mine');break;}}
   }
   if(race.mode==='quali'){
+    qualiPlan(dt);
     // (a car that broke down on its flying lap will never finish it)
     if(!race.over&&race.t>=QUALI_SECONDS&&!cars.some(c=>c.qMode==='flying'&&c.state!=='wreck')){race.over=true;race.overAt=race.t;aiFinishTunes();say('Chequered flag: qualifying is over.');}
   }else if(!race.over&&cars.every(c=>c.state!=='race')){race.over=true;race.overAt=race.t;}

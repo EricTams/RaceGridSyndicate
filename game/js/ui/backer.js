@@ -10,8 +10,8 @@ function renderBacker(){
   const mood=conf>=70?'pleased':conf>=40?'watching closely':conf>=20?'losing patience (interfering)':'furious (ultimatum)';
   $('backer').innerHTML=`
     <h3>THE BACKER · SEASON ${league.season} OF ${CAREER_SEASONS}</h3>
-    <p class="nt-sub" title="The Backer is ${mood}. Below 40 they start interfering. Profit over a season: +5, a loss: −5.">CONFIDENCE <b style="color:${conf>=40?'#5cff8a':conf>=20?'#ffb03a':'#ff3b3b'}">${Math.round(conf)}</b>${league.debt>0?` · OWED ${league.debt.toFixed(2)}M`:''} · TITLES ${league.titles} · below 40 the Backer starts interfering</p>
-    <p class="gmoney" title="Met: confidence +15. Missed: −20.${league.season===1?' A lenient first season.':''}"><b>PRIMARY:</b> ${objText(b.primary)} → met: confidence +15, missed: −20</p>
+    <p class="nt-sub" title="The Backer is ${mood}. Below 40 they start interfering. Profit over a season: +5, a loss: −5.">CONFIDENCE <b style="color:${conf>=40?'#5cff8a':conf>=20?'#ffb03a':'#ff3b3b'}">${Math.round(conf)}</b>${league.debt>0?` · OWED ${league.debt.toFixed(2)}M`:''} · TITLES ${league.titles}</p>
+    <p class="gmoney" title="Met: confidence +15. Missed: −20.${league.season===1?' A lenient first season.':''}"><b>PRIMARY:</b> ${objText(b.primary)}</p>
     ${b.optional?`<p class="gmoney pop"><b>OPTIONAL:</b> ${objText(b.optional.objective)} → +${b.optional.cash.toFixed(2)}M QT, confidence +${b.optional.conf}.</p>`:
       `<h4 style="margin-top:8px">PICK ONE OPTIONAL OBJECTIVE</h4><div class="offer">${b.offers.map((o,i)=>`<button class="tcard need" data-opt="${i}">
         ${objText(o.objective)}<br>+${o.cash.toFixed(2)}M QT, confidence +${o.conf}</button>`).join('')}</div>`}

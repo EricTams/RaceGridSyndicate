@@ -269,25 +269,26 @@ Each car has four parts that wear every race; between races you choose to leave 
 **Garage decisions (between races)**
 
 - **Rebuild:** re-machine or recast the whole part. Costs 60% of a new part at that level and restores full condition, same level.
-- **Develop new:** a new part that is 6 levels better and fresh, ready in 3 races. Price rises steeply with level.
+- **Develop new:** BUILD opens **three design cards, one per style**, each with a level 1-5 drawn from the Technical Director's DESIGN (the design meeting's curve at its STANDARD spread; nothing widens it): **PERFORMANCE** +(5 + level) levels, a race slower, arrives at 80% condition; **QUICK** +(3 + level), a race faster (min 1), 90%; **ROBUST** +(4 + level), on time, 100%. The Technical Director's MECHANICAL sets the base build time (3 races, 2 at 4+). A part's three cards are dealt once and kept until one is built (backing out never re-deals); a new Technical Director or a new season deals fresh ones. Catch-up and the level-3 Machine Shop bonus add on top. AI managers get the same cards (rookies pick at random, pros and elites weigh the jump against time and condition). Price rises steeply with level.
 - These are decisions, not automatic bills, which keeps the no-nickel-and-diming rule.
 
 **A new car every season**
 
-- At season end every team's parts reset to the tier's base level **plus 40% of each part's lead over its field**, plus anything its Design Studio banked. Over-investing in parts during a season is allowed and partly carries over: a rich team that spends the most starts next year ahead, but loses most of what it spent.
-- Developments still in progress finish before the reset. Promotion measures your carry-over against the tier you left, so a dominant team arrives less far behind.
+- At season end every team's parts **decay toward the base level of the tier it races in next season**: new level = base + share × (end-of-season level − base), plus anything its Design Studio banked. The share is the Technical Director's DESIGN: 30% → 70% (+10% a point); the regulated part keeps half that; a part below the base (usually after a promotion) carries 40% of the shortfall, so it's pulled most of the way up. Over-investing in parts during a season is allowed and partly carries over.
+- Developments still in progress finish before the reset. A relegated team decays toward the lower base from its higher levels, so it usually arrives strong and can bounce back; a promoted team decays toward the higher base, usually from below, so it starts near the new base, behind the established teams. **A promoted team gets a league grant of the new tier's money** (2.00M QT into the Sprawl League, 3.50M into the Corporate Grand Circuit), AI teams included.
 - **NEW CAR** shows each part's new level and where it came from (base, carried, studio) against the field.
 
 **Regulation changes**
 
 - Mid-season, the rules committee names **2 parts under review**. At season end one of them gets new regulations, each with a fictional name: *Flux-limiter mandate* (engine), *Crash-cell standard* (chassis), *Bodywork homologation* (body), *Ordnance treaty* (weapons).
-- **The regulated part keeps none of its lead** in the new car (a deficit still carries). Over-developing a part under review is a visible gamble.
+- **The regulated part keeps half the usual share** of its level above the base in the new car. Over-developing a part under review is a visible gamble.
 
 **The design meeting** (after NEW CAR, every season and at a career start)
 
-- First choose how hard to push: **SAFE** (3 picks, every part starts the season at 100% condition), **STANDARD** (4 picks, 85%) or **EXPERIMENTAL** (5 picks, 70%).
-- Each pick is one idea card from your **Technical Director**, mostly numbers: one part +(3.5 + ½ DESIGN), 4 → 6; two parts +(1 + ½ MECHANICAL) each; or a trade, one part +(5.5 + ½ DESIGN), 6 → 8, and another −2.
-- The rest of the crew adds **options per pick**: 2 from the Technical Director, +1 each for Crew Chief DESIGN, Pit Boss MECHANICAL and Fixer PEOPLE at 3+ (another +1 at 5), +1 with a level-3 Design Studio.
+- First choose how hard to push: **SAFE** (3 picks, every part starts the season at 100% condition, card quality consistent), **STANDARD** (4 picks, 85%, varied) or **EXPERIMENTAL** (5 picks, 70%, unpredictable).
+- **Who pitches, per pick:** 2 cards from the **Technical Director**, 1 each from the Crew Chief, Pit Boss and Fixer (if hired), +1 with a level-3 Design Studio (the Technical Director's work). Up to 6 options.
+- **Every card has a level, 1 to 5, shown on the card** (rolled when dealt, never after you pick). The level sets the numbers: one part +(2 + level), 3 → 7; two parts +2/+2/+3/+3/+4 each; or a trade, one part +(4 + level), 5 → 9, and another −2.
+- **The pitcher's MECHANICAL sets the odds**, whatever their role: levels average 1.6 at MECHANICAL 1 → 4.4 at 5 (+0.7 a point), and any level can come from anyone (a beta curve plus a 5% even floor). How hard you push only widens or tightens the curve; the average stays put. At MECHANICAL 3: SAFE 2/22/52/22/2%, STANDARD 5/26/38/26/5%, EXPERIMENTAL 12/24/27/24/13% for levels 1-5.
 - AI teams hold the same meeting: elite managers push EXPERIMENTAL when they can afford the rebuilds, pros go STANDARD, rookies pick at random.
 
 **Next-year projects** (the Design Studio): pay now (0.6M QT × tier money) for a part type; after 3 races the project banks +(3 + ½ DESIGN) levels onto next season's car. It does nothing this season. AI managers with cash to spare do the same (elites up to 2 at once, pros 1, rookies never).
@@ -374,15 +375,17 @@ Staff come from **one persistent world pool** (about 140 people across the three
 | **Crew Chief** (race day) | DESIGN | Night Tune cards aimed at what the car needs 10% → 70%; chance of a 4th card 0% → 60%; sweet spot within 5 → 7 of the target; +1 final-tune pick at 4+ |
 | | PEOPLE | Driver feedback noise +8% → −22%; DIAL IT IN cards 0% → 8% of cards once there's feedback (set a gauge to your best read); morale's resting level +0 → +8 |
 | **Pit Boss** (race day) | NERVE | Pit stops take 103% → 73% of normal time |
-| | MECHANICAL | Part wear in races 0% → −24%; each stop patches the most worn part +5% → +25% condition |
-| **Technical Director** (strategic) | DESIGN | New parts +7 levels (+8 at 5); sizes design-meeting cards and Design Studio projects |
-| | MECHANICAL | New parts ready in 3 → 2 races; spreads design-meeting cards over two parts |
+| | MECHANICAL | Part wear in races 0% → −24%; each stop patches the most worn part +5% → +25% condition; their design-meeting card's level |
+| **Technical Director** (strategic) | DESIGN | New-part design cards average level 1.6 → 4.4; keeps 30% → 70% of each part's level above the base into next season; sizes Design Studio projects |
+| | MECHANICAL | New parts ready in 3 → 2 races; design-meeting card levels (see the design meeting) |
 | **Fixer** (strategic) | PEOPLE | Sponsor offers +0% → +20% (a 4th offer at 4+); driver scouting (growth arrows at 2+, a 4th market candidate at 4+); rival car reads ±10 → ±1.5 (every rival part is known only as a range, and "vs field" figures carry the same uncertainty) |
 | | NERVE | Contracts (drivers, staff, raises) −0% → −20% when signed; keeps the heat off your drivers: morale hits 0% → −32% softer (the garage's morale breakdown credits it); after a race makes a bad night pay: a driver wrecked by a rival wants payback at 4+ (the −6 becomes +2, +4 at 5), the part that failed and put a car out is patched by its supplier (+20% condition a star), and a rival who wrecked your car pays damages if their fixer's NERVE is below yours (0.05M × tier money a point of gap; a tougher fixer laughs it off and yours learns their NERVE); event and fixer-deal costs −0% → −40%; unlocks the fixer's dirty deals (3+) and the dirtiest (4+) |
 
 A vacant role works like skill 1. Salary follows someone's top two skills (the top one counts most), so a specialist costs about the same as an all-rounder of the same level.
 
 **The pool over time.** Contracts that end send people back to the pool; everyone ages and their skills drift (the young improve, the old fade); veterans retire; about 8 newcomers arrive each season. At every season start the **rival teams hire first** (higher tiers first, then by last season's standings); at a career start your tier's rivals hire in pecking-order order, a round per role, so the best team can't take all four of the best people.
+
+Off-role skills can matter too: every crew member's MECHANICAL sets the level of the design-meeting card they pitch (shown in their tooltip).
 
 **Screens.** CREW shows your four roles (who's in each, or HIRE on an open one). The Fixer's seat is settled first (hired or left vacant), since their NERVE bargains down every contract after; then the rest in any order. AI teams hire their fixer first too. HIRE opens that role's list: everyone working in your tier (rivals' staff dimmed, with their team and salary, so you can see who's spending) plus the free agents, sorted by fit, with an AVAILABLE filter. Anyone can be hired; the contract cost is the only limit. (Later idea: top staff prefer to work at great shops, and a room like Crew Quarters could raise a lesser-known shop's appeal.)
 
@@ -588,7 +591,7 @@ The look is chunky, pixelated low-poly models on a dark, semi-abstract isometric
 - Business events (10 cards, 2 known-outcome options each); the Backer (season objectives, confidence, interference events, emergency loans) and the 10-season career with an outcome grade.
 - Staff: a persistent world pool of people with four skills (MECHANICAL, DESIGN, PEOPLE, NERVE) who can fill any of the four roles; rivals hire first; CREW screen plus a per-role list. AI teams run on real staff.
 - HQ rooms (Machine Shop, Design Studio, Sim Rig, Data Den, Street Front / Corporate Suite, Lounge) and five Night Tune test facilities, 3 levels each, bought from the garage's HQ screen.
-- A new car every season (shown on the new-car and design-meeting screens as your car turning on a neon display stand in your colours, flashing as each pick lands; 40% carry-over, the regulated part keeps none of its lead, Design Studio projects), then the design meeting (SAFE / STANDARD / EXPERIMENTAL, then 3–5 picks of the technical director's cards; the crew adds options).
+- A new car every season (shown on the new-car and design-meeting screens as your car turning on a neon display stand in your colours, flashing as each pick lands; parts decay toward the next tier's base keeping 30-70% of their level above it by Technical Director DESIGN (shortfalls 40%, the regulated part half), a league grant on promotion, Design Studio projects), then the design meeting (SAFE / STANDARD / EXPERIMENTAL, then 3–5 picks from levelled idea cards: 2 from the technical director, 1 from each other crew member, levels drawn from the pitcher's MECHANICAL).
 - Two reputation tracks, Street Cred and Corporate Standing; every sponsor brand is street or corporate and prices from its track.
 - **Screen flow (benchmarked against Golden Lap: one purpose per screen).** The race screen shows only during a live session (qualifying or race). The track fills the window, with small overlays: standings top-left, a few radio lines top-right that fade, one fixed-size widget for both cars bottom-left (four resource bars with order pills, BOX opening the pit plan), and speed controls bottom-right. Every decision off the track is its own full-page screen:
   - A new career: crew → drivers → your first car → design meeting → season sponsor → Backer → short-term sponsor → Night Tune.

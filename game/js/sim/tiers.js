@@ -50,12 +50,13 @@ function promoteAndRelegate(){
   [0,1,2].forEach(k=>order[k].forEach((t,i)=>{if(!t.you){t.rep=clampRep(0.6*t.rep+0.4*(100-i*10));t.lastPos=i+1;}}));
   const moves=new Map();
   [0,1].forEach(k=>{order[k].slice(0,2).forEach(t=>moves.set(t,k+1));order[k+1].slice(-2).forEach(t=>moves.set(t,k));});
-  moves.forEach((to,t)=>{if(!t.you)t.rep=clampRep(t.rep+(to>t.tier?-15:10));t.tier=to;});
+  // A promoted team gets a league grant (the new tier's money) to help it catch up with cars built for a bigger pond.
+  moves.forEach((to,t)=>{if(to>t.tier)t.cash+=TIER_MONEY[to];if(!t.you)t.rep=clampRep(t.rep+(to>t.tier?-15:10));t.tier=to;});
   ALL_TEAMS.filter(t=>!t.you&&t.tier!==me.tier).forEach(evolveOffscreen);
   [2,1,0].forEach(k=>{const champ=order[k][0];if(k!==from)lines.push(`${TIER_NAMES[k]} champions: ${champ.name}.`);});
   if(me.tier!==from){
     const up=me.tier>from;
-    lines.push(up?`PROMOTED to the ${TIER_NAMES[me.tier]}!`:`Relegated to the ${TIER_NAMES[me.tier]}.`);
+    lines.push(up?`PROMOTED to the ${TIER_NAMES[me.tier]}! League grant +${TIER_MONEY[me.tier].toFixed(2)}M QT.`:`Relegated to the ${TIER_NAMES[me.tier]}.`);
     // A bigger pond: sponsors see you as smaller fish after promotion, and bigger after relegation.
     me.street=clampRep(me.street+(up?-15:10));me.corp=clampRep(me.corp+(up?-15:10));
     league.confidence=Math.max(0,Math.min(100,league.confidence+(up?15:-20)));
